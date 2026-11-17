@@ -5,6 +5,7 @@ import webbrowser
 
 from flask import Flask, render_template, request
 from werkzeug.utils import secure_filename
+from docx.opc.exceptions import PackageNotFoundError
 
 from analyzer.pdf_reader import extract_pdf_text
 from analyzer.docx_reader import extract_docx_text, DocxReadError
@@ -77,24 +78,11 @@ def analyze():
         # Save the uploaded resume
         file.save(filepath)
 
-        # Extract text (the rest of the analysis is the same for both types)
-        if extension == ".docx":
-            resume_text = extract_docx_text(filepath)
-        else:
-            resume_text = extract_pdf_text(filepath)
-
-        if not resume_text.strip():
-            return f"No readable text found in this {file_type}."
-        # Save the uploaded resume.
-        file.save(filepath)
-
         # Extract text using the centralized format dispatcher.
         resume_text = extract_resume_text(filepath)
 
         if not resume_text.strip():
-            if extension == ".pdf":
-                return "No readable text found in this PDF."
-            return "No readable text found in this DOCX."
+            return f"No readable text found in this {file_type}."
 
         # Detect and organize sections
         resume_sections = extract_sections(resume_text)
@@ -122,7 +110,6 @@ def analyze():
         ats_result = analyze_ats(resume_text, found_skills)
 
         # Job Description Matching
-        job_description = request.form.get("job_description", "")
         job_match = match_resume_to_job(found_skills, job_description)
 
         print("\n========== RESUME ANALYSIS ==========")
@@ -142,15 +129,17 @@ def analyze():
             resume_text=resume_text,
             resume_score=resume_score,
             score_breakdown=score_breakdown,
-            recommendations=recommendations
-            keyword_analysis=keyword_analysis
+            recommendations=recommendations,
+            keyword_analysis=keyword_analysis,
             ats_result=ats_result,
             resume_sections=resume_sections,
             job_match=job_match
         )
 
-    except DocxReadError as error:
+    except (DocxReadError, PackageNotFoundError) as error:
         # The message was written for the user, so it is safe to show
+        if isinstance(error, PackageNotFoundError):
+            return "This file is not a valid DOCX document."
         return str(error)
 
     except Exception as error:
