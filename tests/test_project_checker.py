@@ -12,6 +12,12 @@ class TestProjectDescriptionQualityChecker(unittest.TestCase):
         self.assertTrue(len(result["general_suggestions"]) > 0)
         self.assertTrue(len(result["sample_templates"]) > 0)
 
+    def test_none_inputs_handled_safely(self):
+        result = check_project_descriptions(None, resume_sections={"projects": None})
+        self.assertEqual(result["total_projects"], 0)
+        self.assertEqual(result["quality_score"], 0)
+
+
     def test_no_projects_section(self):
         text = """
         John Doe
