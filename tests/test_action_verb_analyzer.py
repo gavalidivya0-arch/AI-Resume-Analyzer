@@ -108,6 +108,11 @@ class TestActionVerbDetection(unittest.TestCase):
         self.assertIn("optimized", result["all_verbs_found"])
         self.assertIn("reduced", result["all_verbs_found"])
 
+    def test_none_section_values_handled_safely(self):
+        result = analyze_action_verbs("Engineered backend", resume_sections={"experience": None, "projects": None})
+        self.assertGreaterEqual(result["total_action_verbs"], 1)
+
+
 
 class TestRepeatedVerbsHighlighting(unittest.TestCase):
     """Verify frequently repeated verbs (>= 3 times) are highlighted."""
