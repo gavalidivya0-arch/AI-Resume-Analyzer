@@ -54,7 +54,7 @@ CORE_SECTIONS = ["education", "skills", "projects", "experience"]
 
 def _analyze_education(text: str) -> Dict[str, Any]:
     """Evaluate quality and completeness of Education section."""
-    clean = text.strip()
+    clean = (text or "").strip()
     if not clean:
         return {
             "name": "Education",
@@ -131,7 +131,7 @@ def _analyze_education(text: str) -> Dict[str, Any]:
 
 def _analyze_skills(text: str) -> Dict[str, Any]:
     """Evaluate quality and completeness of Skills section."""
-    clean = text.strip()
+    clean = (text or "").strip()
     if not clean:
         return {
             "name": "Skills",
@@ -205,7 +205,7 @@ def _analyze_skills(text: str) -> Dict[str, Any]:
 
 def _analyze_projects(text: str) -> Dict[str, Any]:
     """Evaluate quality and completeness of Projects section."""
-    clean = text.strip()
+    clean = (text or "").strip()
     if not clean:
         return {
             "name": "Projects",
@@ -277,7 +277,7 @@ def _analyze_projects(text: str) -> Dict[str, Any]:
 
 def _analyze_experience(text: str) -> Dict[str, Any]:
     """Evaluate quality of Experience section without penalizing if missing (optional for students)."""
-    clean = text.strip()
+    clean = (text or "").strip()
     if not clean:
         return {
             "name": "Work Experience",
@@ -352,7 +352,7 @@ def _analyze_experience(text: str) -> Dict[str, Any]:
 
 def _analyze_generic_optional_section(name: str, text: str) -> Dict[str, Any]:
     """Analyze optional sections (Summary, Certifications, Achievements) if present."""
-    clean = text.strip()
+    clean = (text or "").strip()
     words = clean.split()
     word_count = len(words)
 
