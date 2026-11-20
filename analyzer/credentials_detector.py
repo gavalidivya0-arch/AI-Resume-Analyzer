@@ -53,15 +53,21 @@ def _split_into_candidates(raw_text: str) -> List[str]:
 
     lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
 
-    # If text is on a single line, try splitting by bullets, semicolons, or pipes
-    if len(lines) == 1 and (";" in lines[0] or "•" in lines[0] or " | " in lines[0]):
+    # If text is on a single line, try splitting by bullets, semicolons, pipes, dashes, or commas
+    if len(lines) == 1:
         single = lines[0]
         if "•" in single:
             parts = single.split("•")
         elif ";" in single:
             parts = single.split(";")
-        else:
+        elif " | " in single:
             parts = single.split(" | ")
+        elif " - " in single:
+            parts = single.split(" - ")
+        elif ", " in single and len(single.split(", ")) >= 2:
+            parts = single.split(", ")
+        else:
+            parts = [single]
         lines = [p.strip() for p in parts if p.strip()]
 
     return lines
