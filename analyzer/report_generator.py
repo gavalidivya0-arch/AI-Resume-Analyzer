@@ -40,7 +40,8 @@ def _score_section(pdf, data):
     pdf.set_font("Helvetica", "", 11)
 
     for name, marks in data.get("breakdown", {}).items():
-        top = MAX_MARKS.get(name, 10)
+        top = max(1, MAX_MARKS.get(name, 10))
+        marks = max(0, marks or 0)
         pdf.cell(60, 7, name)
         x, y = pdf.get_x(), pdf.get_y() + 2
         pdf.set_fill_color(230, 226, 245)
