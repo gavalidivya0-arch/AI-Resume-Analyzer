@@ -176,20 +176,21 @@ def extract_skills(
 def get_suggestions(found_skills):
 
     suggestions = []
+    skills_set = set(found_skills) if found_skills else set()
 
-    if "Python" not in found_skills:
+    if "Python" not in skills_set:
         suggestions.append("Consider adding Python skills if you have experience.")
 
-    if "SQL" not in found_skills:
+    if "SQL" not in skills_set:
         suggestions.append("Consider learning SQL for database management.")
 
-    if "Git" not in found_skills and "GitHub" not in found_skills:
+    if "Git" not in skills_set and "GitHub" not in skills_set:
         suggestions.append("Add Git and GitHub experience if applicable.")
 
-    if "Machine Learning" not in found_skills:
+    if "Machine Learning" not in skills_set:
         suggestions.append("Explore Machine Learning fundamentals.")
 
-    if "Communication" not in found_skills:
+    if "Communication" not in skills_set:
         suggestions.append("Highlight your communication skills if relevant.")
 
     if not suggestions:

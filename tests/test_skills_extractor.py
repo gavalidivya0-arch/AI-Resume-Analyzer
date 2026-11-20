@@ -57,6 +57,12 @@ class ExistingBehaviourTests(unittest.TestCase):
              "Keep your skills updated."],
         )
 
+    def test_get_suggestions_handles_none(self):
+        suggestions = get_suggestions(None)
+        self.assertIsInstance(suggestions, list)
+        self.assertIn("Consider adding Python skills if you have experience.", suggestions)
+
+
 
 class SkillVariationTests(unittest.TestCase):
 
