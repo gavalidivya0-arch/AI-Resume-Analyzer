@@ -49,6 +49,11 @@ class RecommendationTests(unittest.TestCase):
         self.assertIn("email", text.lower())
         self.assertIn("phone", text.lower())
 
+    def test_none_or_empty_text_does_not_crash(self):
+        self.assertIsInstance(generate_recommendations(None), list)
+        self.assertIsInstance(generate_recommendations(""), list)
+
+
     def test_weak_phrase_is_rewritten_with_the_users_own_words(self):
         resume = GOOD_RESUME.replace(
             "- Built REST APIs that cut page load time by 30%",

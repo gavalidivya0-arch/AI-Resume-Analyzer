@@ -55,6 +55,7 @@ def _split_sections(text):
     A heading is a line that only contains a known heading name.
     Sections that are not found are not in the result.
     """
+    text = text or ""
     names = {name: key for key, group in HEADINGS.items() for name in group}
     sections, current = {}, None
 
@@ -166,6 +167,7 @@ def generate_recommendations(text):
     Sections with nothing to improve are left out.
     (The key is "tips", not "items": Jinja would read "items" as dict.items.)
     """
+    text = text or ""
     sections = _split_sections(text)
     blocks = [("Contact", _contact_tips(text))]
 
