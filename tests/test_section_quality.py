@@ -9,6 +9,13 @@ class TestResumeSectionQualityAnalysis(unittest.TestCase):
         self.assertEqual(result["sections"], {})
         self.assertEqual(result["summary"]["overall_quality"], "No Content")
 
+    def test_none_sections_handled_without_attribute_error(self):
+        null_sections = {"education": None, "skills": None, "projects": None, "experience": None}
+        result = analyze_section_quality("some text", resume_sections=null_sections)
+        self.assertIn("education", result["sections"])
+        self.assertEqual(result["sections"]["education"]["status"], "Missing")
+
+
     def test_complete_resume_sections(self):
         text = """
         John Doe
