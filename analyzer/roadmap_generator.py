@@ -391,7 +391,7 @@ def generate_roadmap(
 
 def calculate_roadmap_progress(
     roadmap: Dict[str, Any],
-    completed_task_ids: Set[str],
+    completed_task_ids: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """Update roadmap task completion states and compute progress metrics.
 
@@ -405,12 +405,13 @@ def calculate_roadmap_progress(
     if not roadmap:
         return {}
 
+    completed_set = set(completed_task_ids) if completed_task_ids is not None else set()
     completed_count = 0
     all_tasks = []
 
     for phase in roadmap.get("phases", []):
         for task in phase.get("tasks", []):
-            is_done = task["id"] in completed_task_ids
+            is_done = task["id"] in completed_set
             task["completed"] = is_done
             if is_done:
                 completed_count += 1
