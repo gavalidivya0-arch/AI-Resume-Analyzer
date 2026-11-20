@@ -126,7 +126,7 @@ def _extract_candidate_sentences(
     sources: List[str] = []
     if resume_sections:
         for key in ("experience", "projects"):
-            sec_text = resume_sections.get(key, "").strip()
+            sec_text = (resume_sections.get(key) or "").strip()
             if sec_text:
                 sources.append(sec_text)
 
