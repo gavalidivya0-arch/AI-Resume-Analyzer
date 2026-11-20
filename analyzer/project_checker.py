@@ -92,6 +92,8 @@ SAMPLE_TEMPLATES = [
 
 def _clean_projects_text(text: str) -> str:
     """Remove leading 'PROJECTS' heading if present in the text."""
+    if not text:
+        return ""
     lines = text.strip().splitlines()
     if not lines:
         return ""
@@ -211,12 +213,12 @@ def check_project_descriptions(
     # Retrieve projects section
     projects_text = ""
     if resume_sections and "projects" in resume_sections:
-        projects_text = resume_sections.get("projects", "").strip()
+        projects_text = (resume_sections.get("projects") or "").strip()
     
     if not projects_text:
         # Fallback: extract sections from text
         extracted = extract_sections(resume_text)
-        projects_text = extracted.get("projects", "").strip()
+        projects_text = (extracted.get("projects") or "").strip()
 
     # If still no projects section, check if there are standalone project lines in resume_text
     if not projects_text:
