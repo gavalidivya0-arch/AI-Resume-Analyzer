@@ -42,6 +42,8 @@ def parse_date_token(token: str, is_end: bool = False) -> Optional[Tuple[int, in
 
     Returns None if token cannot be parsed into a date.
     """
+    if not token or not isinstance(token, str):
+        return None
     clean = token.strip().strip(",.;:()[]").lower()
     if not clean:
         return None
@@ -109,6 +111,7 @@ def extract_timeline_ranges(
 ) -> List[Dict[str, Any]]:
     """Extract structured date ranges from section text."""
     ranges: List[Dict[str, Any]] = []
+    text = text or ""
 
     for line in text.splitlines():
         line_clean = line.strip()
@@ -184,7 +187,7 @@ def check_timeline_consistency(
     ranges: List[Dict[str, Any]] = []
     if resume_sections:
         for sec_key in ("experience", "education", "projects", "internships"):
-            sec_text = resume_sections.get(sec_key, "").strip()
+            sec_text = (resume_sections.get(sec_key) or "").strip()
             if sec_text:
                 ranges.extend(extract_timeline_ranges(sec_text, section_name=sec_key))
 

@@ -44,6 +44,8 @@ class TestParseDateToken(unittest.TestCase):
         self.assertIsNone(parse_date_token("13/2020"))
         self.assertIsNone(parse_date_token("1800"))
         self.assertIsNone(parse_date_token(""))
+        self.assertIsNone(parse_date_token(None))
+
 
 
 class TestExtractTimelineRanges(unittest.TestCase):
