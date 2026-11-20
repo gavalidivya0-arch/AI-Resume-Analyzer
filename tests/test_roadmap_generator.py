@@ -128,6 +128,13 @@ class RoadmapGeneratorUnitTests(unittest.TestCase):
         completed_task = next(t for t in updated["all_tasks"] if t["id"] == roadmap["all_tasks"][0]["id"])
         self.assertTrue(completed_task["completed"])
 
+        # Handles None and lists gracefully without TypeError
+        none_res = calculate_roadmap_progress(roadmap, None)
+        self.assertEqual(none_res["completed_tasks"], 0)
+        list_res = calculate_roadmap_progress(roadmap, [roadmap["all_tasks"][0]["id"]])
+        self.assertEqual(list_res["completed_tasks"], 1)
+
+
 
 class AppRoadmapSessionIntegrationTests(unittest.TestCase):
 
