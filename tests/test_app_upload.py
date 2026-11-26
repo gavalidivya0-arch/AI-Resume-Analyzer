@@ -98,6 +98,9 @@ class UploadTests(unittest.TestCase):
 
         self.assertIn("ATS Compatibility Analysis", html)
         self.assertIn("Python", html)
+        self.assertIn("/download-txt-report", html)
+        self.assertIn("Export as TXT", html)
+        self.assert_uploads_empty()
         self.assert_uploads_empty()
 
     def test_pdf_and_docx_find_the_same_skills(self):
@@ -134,6 +137,19 @@ class UploadTests(unittest.TestCase):
         message = self.upload(buffer.getvalue(), "blank.docx")
 
         self.assertEqual(message, "No readable text found in this DOCX.")
+
+    def test_blank_pdf_says_no_readable_text(self):
+        from pypdf import PdfWriter
+
+        writer = PdfWriter()
+        writer.add_blank_page(width=72, height=72)
+        buffer = io.BytesIO()
+        writer.write(buffer)
+
+        message = self.upload(buffer.getvalue(), "blank.pdf")
+
+        self.assertEqual(message, "No readable text found in this PDF.")
+        self.assert_uploads_empty()
 
 
 if __name__ == "__main__":

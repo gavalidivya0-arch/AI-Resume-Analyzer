@@ -63,11 +63,17 @@ SECTION_PATTERNS = {
     "certifications": {
         "certifications", "certification", "certificates", "courses",
         "licenses and certifications", "certifications and licenses",
-        "professional certifications", "accreditations",
+        "professional certifications", "accreditations", "credentials",
+        "online courses", "coursework", "licenses", "certifications and credentials",
+        "professional credentials", "courses and certificates",
+        "courses and certifications", "certifications and courses",
     },
     "achievements": {
         "achievements", "awards", "honors and awards", "awards and achievements",
         "key achievements", "honors", "accomplishments", "accolades",
+        "recognitions", "awards and recognitions", "honors and accomplishments",
+        "key accomplishments", "notable achievements", "academic achievements",
+        "awards and honors", "achievements and awards",
     },
     "languages": {
         "languages", "language proficiency", "languages known",

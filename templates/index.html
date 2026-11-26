@@ -130,19 +130,52 @@
                     <p>Choose a PDF or DOCX file from your computer</p>
 
                     <input type="file"
+                     id="resume-input"
                            name="resume"
                            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                            required>
+                           <p id="file-name"></p>
+<p id="upload-error" role="alert"></p>
 
                     <small>Accepted formats: PDF, DOCX &middot; Maximum file size: 10 MB</small>
 
                 </div>
 
+
                 <div class="job-input">
 
                     <label for="job_description">
                         🎯 Job description <span>(optional)</span>
+
+                <div class="role-selection-box" style="margin-top: 20px; text-align: left;">
+                    <label for="target_role" style="display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px;">
+                        🎯 Target Career Role <span>(Optional)</span>
+
                     </label>
+                    <p style="color: var(--muted, #9290a5); font-size: 12px; margin-bottom: 8px;">
+                        Select your desired career role to receive a personalized skill gap analysis and prioritized learning path.
+                    </p>
+                    <select id="target_role"
+                            name="target_role"
+                            style="width: 100%; padding: 12px 14px; border: 1px solid var(--border, #ddd8f3); border-radius: 10px; font-family: inherit; font-size: 14px; background: var(--surface, #ffffff); color: var(--text, #2d2b38); cursor: pointer;">
+                        <option value="">-- Auto-detect closest career role --</option>
+                        {% if supported_roles %}
+                            {% for role in supported_roles %}
+                                <option value="{{ role }}">{{ role }}</option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="Backend Developer">Backend Developer</option>
+                            <option value="Frontend Developer">Frontend Developer</option>
+                            <option value="Full Stack Developer">Full Stack Developer</option>
+                            <option value="Data Scientist">Data Scientist</option>
+                            <option value="Machine Learning Engineer">Machine Learning Engineer</option>
+                            <option value="DevOps Engineer">DevOps Engineer</option>
+                            <option value="Data Analyst">Data Analyst</option>
+                            <option value="Mobile Developer">Mobile Developer</option>
+                        {% endif %}
+                    </select>
+                </div>
+
 
                     <p style="color: #9290a5; font-size: 12px; margin-bottom: 10px;">
                         Paste the target job description to match your skills, identify missing keywords, and get role-specific skill suggestions.
@@ -155,6 +188,21 @@
                               placeholder="Paste the job requirements, qualifications, and role description here..."></textarea>
 
                     <small>Only used for this analysis. It is not saved.</small>
+
+
+                <div class="job-description-box" style="margin-top: 20px; text-align: left;">
+                    <label for="job_description" style="display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px;">
+                        💼 Job Description <span>(Optional)</span>
+                    </label>
+                    <p style="color: var(--muted, #9290a5); font-size: 12px; margin-bottom: 8px;">
+                        Paste the target job description to match keywords and calculate semantic job fit.
+                    </p>
+                    <textarea id="job_description"
+                              name="job_description"
+                              rows="5"
+                              maxlength="20000"
+                              placeholder="Paste the job requirements, qualifications, and role description here..."
+                              style="width: 100%; padding: 12px 14px; border: 1px solid var(--border, #ddd8f3); border-radius: 10px; font-family: inherit; font-size: 13px; resize: vertical; line-height: 1.6;"></textarea>
 
                 </div>
 

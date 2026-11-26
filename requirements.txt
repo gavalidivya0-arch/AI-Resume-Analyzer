@@ -1,4 +1,9 @@
 Flask
 pypdf
+sentence-transformers
 python-docx
-python-docx
+
+fpdf2
+pytesseract
+pillow
+

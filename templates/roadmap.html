@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Resume Improvement Roadmap</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</head>
+
+<body>
+
+<div class="result-container">
+
+    <header class="result-header">
+        <div class="result-topbar">
+            <a href="javascript:history.back()" class="back-link">← Back to Analysis</a>
+
+            <button type="button" id="themeToggle" class="theme-toggle">
+                🌙 Dark Mode
+            </button>
+        </div>
+
+        <span class="tag">✦ ACTIONABLE CAREER PLAN</span>
+        <h1>Resume Improvement Roadmap</h1>
+        <p>{{ roadmap.summary }}</p>
+    </header>
+
+    <!-- Overview Progress Card -->
+    <section class="result-card">
+        <h2>Your Progress</h2>
+
+        <div style="margin: 16px 0; padding: 18px; background: var(--surface-soft, #f7f6fd); border-radius: 12px;">
+            <div class="score-label" style="margin-bottom: 8px;">
+                <span><strong>Overall Task Completion</strong></span>
+                <strong id="roadmap-progress-text">
+                    {{ roadmap.completed_tasks }} of {{ roadmap.total_tasks }} Tasks Completed ({{ roadmap.completion_percentage }}%)
+                </strong>
+            </div>
+
+            <div class="progress-track" style="height: 10px;">
+                <div class="progress-fill"
+                     id="roadmap-progress-bar"
+                     data-width="{{ roadmap.completion_percentage }}"
+                     style="width: {{ roadmap.completion_percentage }}%;">
+                </div>
+            </div>
+
+            <p class="ats-note" style="margin-top: 10px; font-size: 13px;">
+                Mark items as completed as you implement changes. Your progress stays saved during your session.
+            </p>
+        </div>
+    </section>
+
+    <!-- Roadmap Timeline Phases -->
+    <section class="result-card">
+        <h2>Action Timeline</h2>
+
+        <div class="roadmap-timeline" style="display: flex; flex-direction: column; gap: 24px; margin-top: 16px;">
+            {% for phase in roadmap.phases %}
+            <div class="roadmap-phase" style="border: 1px solid var(--border, #e5e7eb); border-radius: 12px; padding: 18px; background: var(--surface, #ffffff);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 17px; color: var(--heading, #1f1d2b);">
+                            {{ phase.name }}
+                        </h3>
+                        <small style="color: var(--muted, #6b7280); font-weight: 500;">
+                            Timeline: {{ phase.timeline }} &middot; {{ phase.description }}
+                        </small>
+                    </div>
+
+                    <span class="keyword-badge" style="{% if phase.priority == 'High' %}background: rgba(239, 68, 68, 0.15); color: #dc2626;{% elif phase.priority == 'Medium' %}background: rgba(245, 158, 11, 0.15); color: #d97706;{% else %}background: rgba(112, 84, 217, 0.15); color: #7054d9;{% endif %}">
+                        {{ phase.priority }} Priority
+                    </span>
+                </div>
+
+                <div class="task-list" style="display: flex; flex-direction: column; gap: 12px; margin-top: 14px;">
+                    {% for task in phase.tasks %}
+                    <label class="task-card" id="card_{{ task.id }}" style="display: flex; gap: 14px; align-items: flex-start; padding: 14px; background: var(--surface-soft, #faf9fe); border-radius: 8px; border: 1px solid var(--border, #eef0f6); cursor: pointer; transition: all 0.2s ease;">
+                        <input type="checkbox"
+                               class="roadmap-task-checkbox"
+                               data-task-id="{{ task.id }}"
+                               data-priority="{{ task.priority }}"
+                               {% if task.completed %}checked{% endif %}
+                               style="margin-top: 4px; width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent, #7054d9);">
+
+                        <div style="flex: 1;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                                <strong class="task-title" style="font-size: 14px; color: var(--heading, #1f1d2b);">
+                                    {{ task.title }}
+                                </strong>
+                                <span style="font-size: 11px; color: var(--muted, #6b7280); background: var(--surface, #ffffff); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border, #e5e7eb);">
+                                    ⏱ {{ task.estimated_time }}
+                                </span>
+                            </div>
+
+                            <p class="task-desc" style="font-size: 13px; color: var(--text, #374151); margin: 6px 0 0 0; line-height: 1.5;">
+                                {{ task.description }}
+                            </p>
+
+                            <small style="display: inline-block; margin-top: 6px; font-size: 11px; color: var(--accent-text, #7054d9);">
+                                🏷 {{ task.category }}
+                            </small>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,102 @@
+{
+  "Programming Languages": {
+    "Python": ["python3"],
+    "Java": [],
+    "C++": ["cpp"],
+    "C": ["c programming", "c language"],
+    "C#": ["csharp", "c sharp"],
+    "JavaScript": ["js", "ecmascript", "es6"],
+    "TypeScript": [],
+    "Go": ["golang"],
+    "Rust": [],
+    "PHP": [],
+    "Ruby": [],
+    "Swift": [],
+    "Kotlin": [],
+    "R": ["r programming"],
+    "Scala": []
+  },
+  "Web Development": {
+    "HTML": ["html5"],
+    "CSS": ["css3"],
+    "React": ["react.js", "reactjs", "react js"],
+    "Angular": ["angularjs", "angular.js", "angular js"],
+    "Vue": ["vue.js", "vuejs", "vue js"],
+    "Next.js": ["nextjs", "next js"],
+    "Node.js": ["nodejs", "node js", "node"],
+    "Express": ["express.js", "expressjs", "express js"],
+    "Flask": [],
+    "Django": [],
+    "FastAPI": ["fast api"],
+    "Spring Boot": ["springboot"],
+    "ASP.NET": ["asp net"],
+    "Bootstrap": [],
+    "Tailwind CSS": ["tailwind", "tailwindcss"]
+  },
+  "Databases": {
+    "SQL": ["plsql"],
+    "MySQL": [],
+    "PostgreSQL": ["postgres", "postgre sql"],
+    "MongoDB": ["mongo", "mongo db"],
+    "Redis": [],
+    "SQLite": [],
+    "Oracle": ["oracle db", "oracle database"],
+    "Cassandra": [],
+    "DynamoDB": ["dynamo db"]
+  },
+  "Cloud & DevOps": {
+    "AWS": ["amazon web services"],
+    "Azure": ["microsoft azure"],
+    "GCP": ["google cloud platform"],
+    "Google Cloud": [],
+    "Docker": [],
+    "Kubernetes": ["k8s"],
+    "Git": [],
+    "GitHub": [],
+    "GitLab": [],
+    "CI/CD": ["cicd", "ci cd", "continuous integration"],
+    "Linux": [],
+    "Terraform": []
+  },
+  "Data Science & AI": {
+    "Machine Learning": ["ml"],
+    "Deep Learning": ["dl"],
+    "Artificial Intelligence": [],
+    "NLP": ["natural language processing"],
+    "Computer Vision": [],
+    "Data Analysis": ["data analytics"],
+    "Pandas": [],
+    "NumPy": [],
+    "Matplotlib": [],
+    "TensorFlow": [],
+    "PyTorch": [],
+    "Keras": [],
+    "Scikit-Learn": ["sklearn"],
+    "OpenCV": []
+  },
+  "Tools": {
+    "Excel": ["microsoft excel", "ms excel", "advanced excel"],
+    "Tableau": [],
+    "Power BI": ["powerbi"],
+    "Jira": [],
+    "Postman": [],
+    "Selenium": []
+  },
+  "Core Concepts": {
+    "REST API": ["rest apis", "restful api", "restful apis", "restful"],
+    "GraphQL": [],
+    "Data Structures": ["data structure", "dsa"],
+    "Algorithms": ["algorithm"],
+    "OOP": ["oops", "object oriented programming", "object oriented"],
+    "Microservices": ["microservice"],
+    "System Design": [],
+    "Agile": [],
+    "Scrum": []
+  },
+  "Soft Skills": {
+    "Communication": [],
+    "Problem Solving": ["problem solver"],
+    "Teamwork": ["team work", "team player"],
+    "Leadership": []
+  }
+}

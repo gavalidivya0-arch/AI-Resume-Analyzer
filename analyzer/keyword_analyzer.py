@@ -272,6 +272,129 @@ def _compare_with_job(resume_entries, job_description):
     }
 
 
+# Section display mapping and prioritization (Issue #59)
+SECTION_DISPLAY_TITLES = {
+    "skills": "Skills",
+    "experience": "Work Experience",
+    "projects": "Projects",
+    "summary": "Professional Summary",
+    "education": "Education",
+    "certifications": "Certifications",
+    "achievements": "Achievements",
+    "internships": "Internships",
+    "contact_info": "Contact Information",
+}
+
+CORE_SECTIONS = [
+    ("skills", "Skills"),
+    ("experience", "Work Experience"),
+    ("projects", "Projects"),
+]
+
+
+def extract_section_keywords(resume_sections, wanted_job_keywords=None):
+    """Identify, group, and categorize keywords appearing in individual resume sections.
+
+    Focuses primarily on Skills, Work Experience, and Projects, while supporting
+    any other recognized non-empty resume sections.
+
+    Args:
+        resume_sections: Dictionary mapping section keys (e.g. 'skills') to section text.
+        wanted_job_keywords: Optional set or list of keyword names extracted from JD.
+
+    Returns:
+        Tuple of (section_keywords_dict, cross_section_keywords_list).
+    """
+    if not resume_sections:
+        return {}, []
+
+    wanted_lower = {k.lower() for k in wanted_job_keywords} if wanted_job_keywords else set()
+
+    distribution = {}
+    section_results = {}
+
+    # Order: Core sections (Skills, Work Experience, Projects) first, then other sections
+    keys_to_process = []
+    for key, _title in CORE_SECTIONS:
+        if key in resume_sections:
+            keys_to_process.append(key)
+    for key in resume_sections:
+        if key not in keys_to_process and str(resume_sections[key]).strip():
+            keys_to_process.append(key)
+
+    for sec_key in keys_to_process:
+        sec_text = str(resume_sections.get(sec_key, "") or "").strip()
+        sec_title = SECTION_DISPLAY_TITLES.get(sec_key, sec_key.replace("_", " ").title())
+
+        if not sec_text:
+            if sec_key in {"skills", "experience", "projects"}:
+                section_results[sec_key] = {
+                    "section_key": sec_key,
+                    "title": sec_title,
+                    "total_words": 0,
+                    "keywords": [],
+                    "matched_job_keywords": [],
+                    "keyword_count": 0,
+                }
+            continue
+
+        words_count, entries = _count_all(sec_text)
+        chosen = _pick_keywords(entries, limit=15)
+
+        sec_keywords = []
+        matched_in_sec = []
+
+        for _k, entry in chosen:
+            kw_name = entry["keyword"]
+            kw_count = entry["count"]
+            is_skill = entry["is_skill"]
+            is_job_match = kw_name.lower() in wanted_lower
+
+            sec_keywords.append({
+                "keyword": kw_name,
+                "count": kw_count,
+                "is_skill": is_skill,
+                "is_job_match": is_job_match,
+            })
+
+            if is_job_match:
+                matched_in_sec.append(kw_name)
+
+            # Record in global cross-section distribution
+            dist_key = kw_name.lower()
+            if dist_key not in distribution:
+                distribution[dist_key] = {
+                    "keyword": kw_name,
+                    "total_count": 0,
+                    "section_names": [],
+                    "section_breakdown": {},
+                    "is_job_match": is_job_match,
+                    "is_skill": is_skill,
+                }
+            distribution[dist_key]["total_count"] += kw_count
+            if sec_title not in distribution[dist_key]["section_names"]:
+                distribution[dist_key]["section_names"].append(sec_title)
+            distribution[dist_key]["section_breakdown"][sec_title] = kw_count
+
+        section_results[sec_key] = {
+            "section_key": sec_key,
+            "title": sec_title,
+            "total_words": words_count,
+            "keywords": sec_keywords,
+            "matched_job_keywords": matched_in_sec,
+            "keyword_count": len(sec_keywords),
+        }
+
+    # Cross-section keywords: keywords appearing in 2 or more sections
+    cross_section_keywords = [
+        item for item in distribution.values()
+        if len(item["section_names"]) > 1
+    ]
+    cross_section_keywords.sort(key=lambda x: (-x["total_count"], x["keyword"].lower()))
+
+    return section_results, cross_section_keywords
+
+
 def _make_tips(keywords, job_match):
     """Write short, plain-English advice based on the results."""
     tips = []
@@ -307,19 +430,21 @@ def _make_tips(keywords, job_match):
 # Main function
 # ------------------------------------------------------------------
 
-def analyze_keywords(resume_text, job_description=""):
+def analyze_keywords(resume_text, job_description="", resume_sections=None):
     """Analyze the keywords of a resume (and compare with a job description).
 
     Returns a dictionary:
-        total_words      number of words in the resume
-        keywords         list of {keyword, count, density, status,
-                         is_skill, bar_width}
-        repeated_total   how many keywords are "repeated"
-        overused_total   how many keywords are "overused"
-        job_match        None, or {keyword_count, match_percent,
-                         matched, missing}
-        tips             list of short advice sentences
-        rules            the numbers used for the statuses (for the page)
+        total_words            number of words in the resume
+        keywords               list of {keyword, count, density, status,
+                               is_skill, bar_width}
+        repeated_total         how many keywords are "repeated"
+        overused_total         how many keywords are "overused"
+        job_match              None, or {keyword_count, match_percent,
+                               matched, missing}
+        tips                   list of short advice sentences
+        rules                  the numbers used for the statuses (for the page)
+        section_keywords       dict of keywords grouped by section (Skills, Experience, Projects, etc.)
+        cross_section_keywords list of keywords appearing across multiple sections
     """
     total_words, resume_entries = _count_all(resume_text)
 
@@ -345,6 +470,26 @@ def analyze_keywords(resume_text, job_description=""):
     if job_description and job_description.strip():
         job_match = _compare_with_job(resume_entries, job_description)
 
+    # Section-wise Keyword Analysis (Issue #59)
+    if resume_sections is None and resume_text:
+        try:
+            from analyzer.section_detector import extract_sections
+            resume_sections = extract_sections(resume_text)
+        except Exception:
+            resume_sections = {}
+
+    wanted_job_keywords = []
+    if job_match and "matched" in job_match and "missing" in job_match:
+        wanted_job_keywords = (
+            [m["keyword"] for m in job_match["matched"]] +
+            [m["keyword"] for m in job_match["missing"]]
+        )
+
+    section_keywords, cross_section_keywords = extract_section_keywords(
+        resume_sections=resume_sections,
+        wanted_job_keywords=wanted_job_keywords,
+    )
+
     return {
         "total_words": total_words,
         "keywords": keywords,
@@ -357,6 +502,8 @@ def analyze_keywords(resume_text, job_description=""):
             "overused_count": OVERUSED_MIN_COUNT,
             "overused_density": OVERUSED_MIN_DENSITY,
         },
+        "section_keywords": section_keywords,
+        "cross_section_keywords": cross_section_keywords,
     }
 
 

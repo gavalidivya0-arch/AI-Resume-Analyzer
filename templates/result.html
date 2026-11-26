@@ -8,6 +8,9 @@
 
     <link rel="stylesheet"
     href="{{ url_for('static', filename='style.css') }}">
+
+    <!-- Loaded in <head> so the saved theme is applied before the page shows -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </head>
 
 <body>
@@ -36,26 +39,63 @@
 
 
     <!-- Resume Score -->
+    {#
+        One value drives the number, the ring, the accessibility text and the
+        label below, so they always match. It comes straight from the backend
+        score and is kept between 0 and 100.
+    #}
+    {% set score = [[resume_score|int, 0]|max, 100]|min %}
+
     <section class="result-card score-card">
 
         <h2>Overall Resume Score</h2>
 
-        <div class="score-circle"
-             style="--score: {{ resume_score }}%">
+        <div class="score-ring"
+             role="progressbar"
+             aria-label="Overall resume score"
+             aria-valuemin="0"
+             aria-valuemax="100"
+             aria-valuenow="{{ score }}"
+             aria-valuetext="{{ score }} out of 100">
 
-            <div class="score-inner">
-                <strong>{{ resume_score }}</strong>
+            <svg viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+
+                <defs>
+                    <linearGradient id="scoreRingGradient"
+                                    x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" class="score-ring-stop-start" />
+                        <stop offset="100%" class="score-ring-stop-end" />
+                    </linearGradient>
+                </defs>
+
+                <circle class="score-ring-track" cx="60" cy="60" r="52" />
+
+                {# pathLength="100" makes the ring length 100, so the empty
+                   part of the ring is simply 100 - score #}
+                {% if score > 0 %}
+                <circle class="score-ring-fill"
+                        cx="60" cy="60" r="52"
+                        pathLength="100"
+                        stroke-dasharray="100"
+                        stroke-dashoffset="{{ 100 - score }}"
+                        transform="rotate(-90 60 60)" />
+                {% endif %}
+
+            </svg>
+
+            <div class="score-ring-text">
+                <strong>{{ score }}</strong>
                 <span>/ 100</span>
             </div>
 
         </div>
 
         <h3>
-            {% if resume_score >= 80 %}
+            {% if score >= 80 %}
                 Excellent Resume!
-            {% elif resume_score >= 60 %}
+            {% elif score >= 60 %}
                 Good Progress!
-            {% elif resume_score >= 40 %}
+            {% elif score >= 40 %}
                 Needs Improvement
             {% else %}
                 Keep Improving!
@@ -82,24 +122,69 @@
         'Readability': 10
     } %}
 
-    {% for category, marks in score_breakdown.items() %}
+    {% if overall_explanation %}
+    <p class="ats-note" style="margin-bottom: 20px;">
+        ✦ {{ overall_explanation }}
+    </p>
+    {% endif %}
 
-    <div class="score-row">
+    {% for category, marks in score_breakdown.items() %}
+    {% set cat_detail = category_details.get(category) if category_details else none %}
+    <div class="score-row" style="margin-bottom: 20px;">
 
         <div class="score-label">
             <span>{{ category }}</span>
-            <strong>{{ marks }} / {{ score_limits[category] }}</strong>
+            <strong>{{ marks }} / {{ score_limits.get(category, 10) }}</strong>
         </div>
 
         <div class="progress-track">
             <div class="progress-fill"
-                 data-width="{{ (marks / score_limits[category] * 100)|round(1) }}">
+                 data-width="{{ (marks / score_limits.get(category, 10) * 100)|round(1) }}">
             </div>
         </div>
+
+        {% if cat_detail and cat_detail.explanation %}
+        <p class="category-explanation" style="font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.5;">
+            ℹ️ {{ cat_detail.explanation }}
+        </p>
+        {% endif %}
+
+        {% if cat_detail and cat_detail.improvement %}
+        <p class="category-improvement" style="font-size: 12px; color: #d97706; margin-top: 4px; line-height: 1.4;">
+            💡 <em>Recommendation: {{ cat_detail.improvement }}</em>
+        </p>
+        {% endif %}
 
     </div>
 
     {% endfor %}
+
+    {% if improvement_areas %}
+    <div style="margin-top: 20px; padding: 14px; background: var(--surface-soft); border-left: 3px solid #d97706; border-radius: 8px;">
+        <strong style="font-size: 13px; color: var(--heading);">Areas for Score Improvement ({{ improvement_areas|length }})</strong>
+        <ul style="margin-top: 8px; margin-left: 18px; font-size: 12px; color: var(--text-soft); line-height: 1.6;">
+            {% for area in improvement_areas %}
+            <li><strong>{{ area.category }} (-{{ area.points_lost }} pts):</strong> {{ area.suggestion }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if scoring_formula %}
+    <details style="margin-top: 18px;">
+        <summary style="font-size: 13px; color: var(--accent-text);">📐 How is the score calculated? (Formula)</summary>
+        <p class="ats-note" style="margin-top: 8px; font-size: 13px;">
+            {{ scoring_formula }}
+        </p>
+        {% if category_details %}
+        <ul style="margin-top: 8px; margin-left: 20px; font-size: 12px; color: var(--muted); line-height: 1.6;">
+            {% for cat_name, cat_data in category_details.items() %}
+            <li><strong>{{ cat_name }} ({{ cat_data.max }} pts):</strong> {{ cat_data.formula }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </details>
+    {% endif %}
 
 </section>
 
@@ -125,6 +210,193 @@
         </div>
 
     </section>
+
+
+    <!-- Certifications and Achievements (Issue #56) -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 24px;">
+
+        <!-- Certifications -->
+        <section class="result-card" style="margin-bottom: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border, #eeeef5); padding-bottom: 8px;">
+                <h2 style="margin: 0; font-size: 18px;">Certifications</h2>
+                <span class="tag" style="font-size: 11px;">{{ certifications|length }} detected</span>
+            </div>
+            {% if certifications %}
+            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
+                {% for cert in certifications %}
+                <li style="display: flex; align-items: flex-start; gap: 8px; font-size: 14px; background: var(--surface-soft, #faf9fe); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border, #eeeef5);">
+                    <span style="color: var(--accent, #7054d9); font-size: 16px;">📜</span>
+                    <span style="line-height: 1.4;">{{ cert }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p style="color: var(--muted, #8b87a5); font-size: 13px; margin: 0; font-style: italic;">
+                No certifications detected in your resume. Consider adding relevant professional credentials.
+            </p>
+            {% endif %}
+        </section>
+
+        <!-- Achievements -->
+        <section class="result-card" style="margin-bottom: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border, #eeeef5); padding-bottom: 8px;">
+                <h2 style="margin: 0; font-size: 18px;">Achievements & Awards</h2>
+                <span class="tag" style="font-size: 11px;">{{ achievements|length }} detected</span>
+            </div>
+            {% if achievements %}
+            <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
+                {% for ach in achievements %}
+                <li style="display: flex; align-items: flex-start; gap: 8px; font-size: 14px; background: var(--surface-soft, #faf9fe); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border, #eeeef5);">
+                    <span style="color: #f59e0b; font-size: 16px;">🏆</span>
+                    <span style="line-height: 1.4;">{{ ach }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p style="color: var(--muted, #8b87a5); font-size: 13px; margin: 0; font-style: italic;">
+                No specific achievements detected in your resume. Highlighting key accomplishments, awards, or recognitions can make your profile stand out.
+            </p>
+            {% endif %}
+        </section>
+
+    </div>
+    <!-- Personalized Skill Gap Analysis -->
+    {% if skill_gap %}
+    <section class="result-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <h2>🎯 Personalized Skill Gap Analysis</h2>
+            <span class="tag" style="background: var(--surface-soft, #f3f0fc); color: var(--accent, #7054d9); font-weight: 600;">
+                Role: {{ skill_gap.target_role }} {% if skill_gap.is_auto_detected_role %}(Auto-Detected){% endif %}
+            </span>
+        </div>
+
+        <p class="ats-note" style="margin-top: 8px;">{{ skill_gap.summary }}</p>
+
+        <p class="ats-rating" style="margin-top: 12px;">
+            <strong>{{ skill_gap.match_percentage }}% Role Readiness</strong>
+            &middot; {{ skill_gap.total_matching }} of {{ skill_gap.total_required }} Skills Matched
+            &middot; <span style="color: var(--accent, #7054d9); font-weight: 600;">{{ skill_gap.readiness_level }}</span>
+        </p>
+
+        <div class="score-row" style="margin-top: 10px;">
+            <div class="score-label">
+                <span>{{ skill_gap.target_role }} Requirements Alignment</span>
+                <strong>{{ skill_gap.match_percentage }}%</strong>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill" data-width="{{ skill_gap.match_percentage }}"></div>
+            </div>
+        </div>
+
+        <!-- Matching Skills -->
+        <h3 class="ats-subheading" style="margin-top: 20px;">
+            ✓ Matching Skills ({{ skill_gap.total_matching }})
+        </h3>
+        {% if skill_gap.matching_skills %}
+            <div class="skill-list" style="margin-top: 8px;">
+                {% for item in skill_gap.matching_skills %}
+                    <span class="skill-tag" style="background: rgba(34, 197, 94, 0.12); color: #16a34a; border: 1px solid rgba(34, 197, 94, 0.3);" title="{{ item.reason }}">
+                        ✓ {{ item.skill }} <small style="opacity: 0.85;">({{ item.priority }})</small>
+                    </span>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="ats-note">No matching skills detected for this role yet. Begin with the high-priority skills below!</p>
+        {% endif %}
+
+        <!-- Identified Skill Gaps -->
+        <h3 class="ats-subheading" style="margin-top: 22px;">
+            ✗ Identified Skill Gaps ({{ skill_gap.total_missing }})
+        </h3>
+        {% if skill_gap.missing_skills %}
+            <div class="skill-list" style="margin-top: 8px;">
+                {% for item in skill_gap.missing_skills %}
+                    {% if item.priority == 'High' %}
+                        <span class="skill-tag" style="background: rgba(239, 68, 68, 0.12); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.3);" title="{{ item.reason }}">
+                            ✗ {{ item.skill }} <small style="font-weight: 600;">(Core/High)</small>
+                        </span>
+                    {% elif item.priority == 'Medium' %}
+                        <span class="skill-tag" style="background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3);" title="{{ item.reason }}">
+                            ⚠ {{ item.skill }} <small>(Important)</small>
+                        </span>
+                    {% else %}
+                        <span class="skill-tag" style="background: var(--surface-soft, #f4f4f7); color: var(--muted, #6b7280); border: 1px solid var(--border, #e5e7eb);" title="{{ item.reason }}">
+                            + {{ item.skill }} <small>(Bonus)</small>
+                        </span>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="ats-note" style="color: #16a34a; font-weight: 600;">🎉 Outstanding! You meet all essential and recommended skills for {{ skill_gap.target_role }}.</p>
+        {% endif %}
+
+        <!-- Prioritized Learning Recommendations -->
+        {% if skill_gap.learning_recommendations %}
+        <h3 class="ats-subheading" style="margin-top: 24px;">
+            📚 Prioritized Learning Path & Rationale
+        </h3>
+        <p class="ats-note" style="font-size: 13px; margin-bottom: 12px;">
+            Skills are prioritized by market demand and architectural importance for {{ skill_gap.target_role }}:
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            {% for item in skill_gap.learning_recommendations %}
+            <div style="padding: 12px 14px; background: var(--surface-soft, #faf9fe); border-radius: 8px; border-left: 3px solid {% if item.priority == 'High' %}#dc2626{% elif item.priority == 'Medium' %}#d97706{% else %}#7054d9{% endif %};">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <strong style="color: var(--heading, #1f1d2b); font-size: 14px;">{{ item.skill }} <span style="font-weight: normal; font-size: 12px; color: var(--muted, #6b7280);">({{ item.category }})</span></strong>
+                    <span style="font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 600; {% if item.priority == 'High' %}background: rgba(239, 68, 68, 0.15); color: #dc2626;{% elif item.priority == 'Medium' %}background: rgba(245, 158, 11, 0.15); color: #d97706;{% else %}background: rgba(112, 84, 217, 0.15); color: #7054d9;{% endif %}">
+                        {{ item.priority }} Priority
+                    </span>
+                </div>
+                <p style="font-size: 13px; color: var(--text, #374151); line-height: 1.5; margin: 0 0 4px 0;">
+                    <strong>Why it's needed:</strong> {{ item.reason }}
+                </p>
+                {% if item.learning_tip %}
+                <p style="font-size: 12px; color: var(--accent-text, #7054d9); line-height: 1.4; margin: 0;">
+                    💡 <em>Action Plan: {{ item.learning_tip }}</em>
+                </p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Role Comparison Table / Accordion -->
+        {% if skill_gap.all_roles_summary %}
+        <details style="margin-top: 22px;">
+            <summary style="font-size: 13px; font-weight: 600; color: var(--accent-text, #7054d9); cursor: pointer;">
+                🔍 View Your Readiness Across Other Tech Roles
+            </summary>
+            <div style="margin-top: 12px; overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid var(--border, #e5e7eb); text-align: left;">
+                            <th style="padding: 8px 10px;">Role</th>
+                            <th style="padding: 8px 10px;">Matched Skills</th>
+                            <th style="padding: 8px 10px;">Readiness</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for role_stat in skill_gap.all_roles_summary %}
+                        <tr style="border-bottom: 1px solid var(--border, #f3f4f6); {% if role_stat.is_selected %}background: rgba(112, 84, 217, 0.08); font-weight: 600;{% endif %}">
+                            <td style="padding: 8px 10px;">{{ role_stat.role }} {% if role_stat.is_selected %}⭐{% endif %}</td>
+                            <td style="padding: 8px 10px;">{{ role_stat.matching_count }} / {{ role_stat.total_count }}</td>
+                            <td style="padding: 8px 10px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div class="progress-track" style="flex: 1; height: 6px; margin: 0;">
+                                        <div class="progress-fill" data-width="{{ role_stat.match_percentage }}"></div>
+                                    </div>
+                                    <span>{{ role_stat.match_percentage }}%</span>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+        {% endif %}
+    </section>
+    {% endif %}
 
 
     <!-- Keyword Analysis -->
@@ -155,7 +427,7 @@
 
                 <div class="keyword-bar-track">
                     <div class="keyword-bar keyword-{{ item.status }}"
-                         style="width: {{ item.bar_width }}%"></div>
+                         data-width="{{ item.bar_width }}"></div>
                 </div>
 
                 <div class="keyword-stats">
@@ -235,6 +507,60 @@
 
         {% endif %}
 
+        <!-- Section-wise Keyword Analysis (Issue #59) -->
+        {% if keyword_analysis.section_keywords %}
+        <h3 class="keyword-subtitle" style="margin-top: 28px;">Section-wise Keyword Distribution</h3>
+        <p style="font-size: 13px; color: var(--text-soft, #6b7280); margin-bottom: 16px;">
+            See where your keywords appear across major resume sections. Keywords matching the job description are highlighted.
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px;">
+            {% for sec_key, sec in keyword_analysis.section_keywords.items() %}
+            <div style="background: var(--surface-soft, #faf9fe); border: 1px solid var(--border, #e5e7eb); border-radius: 12px; padding: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid var(--border, #eeedf6); padding-bottom: 8px;">
+                    <strong style="color: var(--text, #302b4c); font-size: 15px;">{{ sec.title }}</strong>
+                    <span class="tag" style="font-size: 11px; padding: 3px 8px;">{{ sec.keyword_count }} keyword(s)</span>
+                </div>
+
+                {% if sec.keywords %}
+                <div class="keyword-chips" style="gap: 8px;">
+                    {% for kw in sec.keywords %}
+                    <span class="keyword-chip {% if kw.is_job_match %}keyword-chip-match{% endif %}" style="font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                        {% if kw.is_job_match %}✓{% endif %} {{ kw.keyword }}
+                        <small style="opacity: 0.85;">{{ kw.count }}×</small>
+                    </span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p style="font-size: 12px; color: var(--muted, #9ca3af); font-style: italic; margin: 8px 0 0 0;">No keywords detected in this section.</p>
+                {% endif %}
+
+                {% if keyword_analysis.job_match and keyword_analysis.job_match.keyword_count %}
+                <div style="margin-top: 10px; font-size: 11px; color: var(--muted, #6b7280);">
+                    Matches job keywords: <strong>{{ sec.matched_job_keywords|length }}</strong>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if keyword_analysis.cross_section_keywords %}
+        <div style="margin-top: 14px; margin-bottom: 20px; padding: 12px 16px; background: rgba(112, 84, 217, 0.06); border-radius: 10px; border-left: 3px solid var(--accent, #7054d9);">
+            <strong style="font-size: 13px; color: var(--accent, #7054d9);">Cross-Section Keywords:</strong>
+            <p style="font-size: 12px; color: var(--text-soft, #4b5563); margin: 4px 0 0 0;">
+                These keywords appear in multiple sections of your resume, reinforcing core qualifications:
+            </p>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;">
+                {% for item in keyword_analysis.cross_section_keywords %}
+                <span class="keyword-chip" style="font-size: 11px; background: var(--surface, #ffffff);">
+                    <strong>{{ item.keyword }}</strong> ({{ item.total_count }}× across {{ item.section_names|join(', ') }})
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% endif %}
+
         <h3 class="keyword-subtitle">What to do</h3>
 
         {% for tip in keyword_analysis.tips %}
@@ -242,6 +568,70 @@
         {% endfor %}
 
     </section>
+
+
+    <!-- Duplicate & Semantic Similarity Detection -->
+    {% if duplicate_analysis %}
+    <section class="result-card duplicate-analysis-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <h2>🔍 Content Repetition & Duplicate Detection</h2>
+            <span class="tag" style="background: var(--surface-soft, #f3f0fc); color: var(--accent, #7054d9); font-weight: 600;">
+                NLP Semantic Analysis
+            </span>
+        </div>
+
+        <p class="ats-note" style="margin-top: 8px;">{{ duplicate_analysis.summary }}</p>
+
+        <p class="ats-rating" style="margin-top: 10px;">
+            <strong>{{ duplicate_analysis.total_duplicates_count }} Repetitive Pair(s) Identified</strong>
+            &middot; {{ duplicate_analysis.exact_duplicates_count }} Exact Duplicate(s)
+            &middot; {{ duplicate_analysis.semantic_duplicates_count }} Semantic Near-Duplicate(s)
+        </p>
+
+        <div style="padding: 10px 14px; background: rgba(112, 84, 217, 0.08); border-left: 3px solid var(--accent, #7054d9); border-radius: 6px; margin: 12px 0; font-size: 12px; color: var(--text-soft, #4b5563); line-height: 1.5;">
+            🔒 <strong>Safe Analysis:</strong> Your original resume text is preserved untouched. Review the highlighted repetitive statements below to improve content variety and maximize bullet point impact.
+        </div>
+
+        {% if duplicate_analysis.has_duplicates %}
+        <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 16px;">
+            {% for pair in duplicate_analysis.duplicate_pairs %}
+            <div style="padding: 14px; border: 1px solid var(--border, #e5e7eb); border-radius: 10px; background: var(--surface-soft, #faf9fe);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                    <span style="font-size: 12px; font-weight: 700; {% if pair.type == 'exact' %}color: #dc2626;{% else %}color: #7054d9;{% endif %}">
+                        {% if pair.type == 'exact' %}⚠️ Exact Duplicate (100% Match){% else %}✦ Semantic Similarity ({{ pair.similarity_percentage }}% Similar){% endif %}
+                    </span>
+                    <span class="keyword-badge" style="{% if pair.type == 'exact' %}background: rgba(239, 68, 68, 0.15); color: #dc2626;{% else %}background: rgba(112, 84, 217, 0.15); color: #7054d9;{% endif %}">
+                        {{ pair.type|capitalize }}
+                    </span>
+                </div>
+
+                <div style="margin: 8px 0; padding: 10px 12px; background: var(--surface, #ffffff); border-radius: 6px; border-left: 3px solid #d1d5db; font-size: 13px; color: var(--text, #374151); line-height: 1.45;">
+                    <strong style="color: var(--muted, #6b7280); font-size: 11px; display: block; margin-bottom: 2px;">Statement 1:</strong>
+                    {{ pair.sentence_1 }}
+                </div>
+
+                <div style="margin: 8px 0; padding: 10px 12px; background: var(--surface, #ffffff); border-radius: 6px; border-left: 3px solid {% if pair.type == 'exact' %}#dc2626{% else %}#7054d9{% endif %}; font-size: 13px; color: var(--text, #374151); line-height: 1.45;">
+                    <strong style="color: var(--muted, #6b7280); font-size: 11px; display: block; margin-bottom: 2px;">Statement 2:</strong>
+                    {{ pair.sentence_2 }}
+                </div>
+
+                <p style="font-size: 12px; color: var(--muted, #6b7280); margin: 6px 0 2px 0;">
+                    ℹ️ {{ pair.explanation }}
+                </p>
+
+                <p style="font-size: 12px; color: #d97706; margin: 2px 0 0 0;">
+                    💡 <em>Recommendation: {{ pair.suggestion }}</em>
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="suggestion" style="margin-top: 12px;">
+            ✦ No repetitive or duplicate statements detected. Every bullet point contributes unique information.
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
 
 
     <!-- Suggestions -->
@@ -288,6 +678,7 @@
         {% endfor %}
 
     </section>
+
 
     <!-- ATS Compatibility -->
     <section class="result-card">
@@ -357,6 +748,439 @@
     </section>
 
 
+    <!-- Resume Section Quality Analysis -->
+    {% if section_quality %}
+    <section class="result-card">
+        <h2>Section Quality & Completeness</h2>
+
+        <p class="ats-note">
+            Detailed evaluation of content depth, key information, and completeness within each section of your resume.
+        </p>
+
+        <p class="ats-rating">
+            <strong>Overall Quality: {{ section_quality.summary.overall_quality }}</strong>
+            &middot; {{ section_quality.summary.complete_sections_count }} Complete
+            {% if section_quality.summary.incomplete_sections_count > 0 %}
+                &middot; {{ section_quality.summary.incomplete_sections_count }} Need Detail
+            {% endif %}
+        </p>
+
+        {% if section_quality.sections %}
+        <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 16px;">
+            {% for sec_key, sec in section_quality.sections.items() %}
+            <div style="border: 1px solid #eeedf6; border-radius: 12px; padding: 16px; background: #faf9ff;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                    <h3 style="margin: 0; font-size: 15px; color: #7054d9;">
+                        {{ sec.name }}
+                        {% if sec.is_optional %}<small style="font-size: 11px; color: #888;">(Optional)</small>{% endif %}
+                    </h3>
+                    <span class="skill-tag" style="{% if sec.status == 'Complete' %}background: #eefbf4; color: #1b8748; border-color: #c6f0d6;{% elif sec.status == 'Needs Detail' or sec.status == 'Missing' %}background: #fff0f0; color: #d94545; border-color: #ffd4d4;{% else %}background: #f0f7ff; color: #0284c7; border-color: #bae6fd;{% endif %}">
+                        {{ sec.status }}{% if sec.present %} ({{ sec.quality_score }}/100){% endif %}
+                    </span>
+                </div>
+
+                {% if sec.strengths %}
+                <div style="margin-top: 6px;">
+                    {% for strength in sec.strengths %}
+                        <span class="skill-tag" style="font-size: 11px; padding: 4px 10px; margin-right: 6px; display: inline-block;">✓ {{ strength }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                {% if sec.gaps %}
+                <div style="margin-top: 8px;">
+                    <strong style="font-size: 12px; color: #d94545;">Gaps / Missing Elements:</strong>
+                    <ul style="margin: 4px 0 8px 18px; font-size: 13px; color: #555;">
+                        {% for gap in sec.gaps %}
+                            <li>{{ gap }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if sec.suggestions %}
+                <div style="margin-top: 8px; border-top: 1px dashed #e4dcff; padding-top: 8px;">
+                    <strong style="font-size: 12px; color: #7054d9;">Recommendations for {{ sec.name }}:</strong>
+                    {% for tip in sec.suggestions %}
+                        <div class="suggestion" style="margin: 6px 0; padding: 10px; font-size: 13px;">
+                            ✦ {{ tip }}
+                        </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if section_quality.summary.key_takeaways %}
+        <h3 class="ats-subheading">Key Section Observations</h3>
+        {% for takeaway in section_quality.summary.key_takeaways %}
+            <div class="suggestion">
+                ✦ {{ takeaway }}
+            </div>
+        {% endfor %}
+        {% endif %}
+    </section>
+    {% endif %}
+
+    <!-- Project Description Quality Analysis -->
+    {% if project_analysis %}
+    <section class="result-card">
+        <h2>Project Description Quality</h2>
+
+        <p class="ats-note">
+            Evaluation of project descriptions to ensure technical stack, problem objectives, and your personal contributions are clearly detailed.
+        </p>
+
+        <p class="ats-rating">
+            <strong>Status: {{ project_analysis.overall_status }}</strong>
+            &middot; {{ project_analysis.total_projects }} project{% if project_analysis.total_projects != 1 %}s{% endif %} detected
+            {% if project_analysis.total_projects > 0 %}
+                &middot; Quality Score: {{ project_analysis.quality_score }} / 100
+            {% endif %}
+        </p>
+
+        {% if project_analysis.projects %}
+        <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px;">
+            {% for proj in project_analysis.projects %}
+            <div style="border: 1px solid #eeedf6; border-radius: 12px; padding: 18px; background: #faf9ff;">
+                <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+                    <h3 style="margin: 0; font-size: 16px; color: #7054d9;">🚀 {{ proj.title }}</h3>
+                    <span class="skill-tag" style="{% if proj.quality_status == 'Detailed & Strong' %}background: #eefbf4; color: #1b8748; border-color: #c6f0d6;{% elif proj.quality_status == 'Needs Improvement' %}background: #fff0f0; color: #d94545; border-color: #ffd4d4;{% endif %}">
+                        {{ proj.quality_status }} ({{ proj.score }}/100)
+                    </span>
+                </div>
+
+                <div class="skill-list" style="margin-top: 8px; margin-bottom: 12px;">
+                    {% if proj.has_technologies %}
+                        <span class="skill-tag">✓ Technologies: {{ proj.technologies|join(', ') }}</span>
+                    {% else %}
+                        <span class="skill-tag missing">✗ Missing Technologies</span>
+                    {% endif %}
+
+                    {% if proj.has_objective %}
+                        <span class="skill-tag">✓ Clear Objective</span>
+                    {% else %}
+                        <span class="skill-tag missing">✗ Missing Objective</span>
+                    {% endif %}
+
+                    {% if proj.has_contributions %}
+                        <span class="skill-tag">✓ Key Contributions</span>
+                    {% else %}
+                        <span class="skill-tag missing">✗ Missing Contributions</span>
+                    {% endif %}
+
+                    {% if proj.has_metrics %}
+                        <span class="skill-tag">✓ Measurable Metrics</span>
+                    {% endif %}
+                </div>
+
+                {% if proj.missing_details %}
+                <div style="margin-top: 10px;">
+                    <strong style="font-size: 13px; color: #d94545;">Missing Details to Address:</strong>
+                    <ul style="margin: 6px 0 10px 20px; font-size: 13px; color: #555;">
+                        {% for detail in proj.missing_details %}
+                            <li>{{ detail }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if proj.wording_suggestions %}
+                <div style="margin-top: 12px; border-top: 1px dashed #e2deee; padding-top: 10px;">
+                    <strong style="font-size: 13px; color: #7054d9;">Sample Wording Suggestions (Use with your own details):</strong>
+                    {% for item in proj.wording_suggestions %}
+                    <div class="suggestion" style="margin: 8px 0; font-size: 13px;">
+                        <strong>{{ item.focus }}:</strong> <code>{{ item.suggestion }}</code>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if project_analysis.general_suggestions %}
+        <h3 class="ats-subheading">General Recommendations</h3>
+        {% for tip in project_analysis.general_suggestions %}
+            <div class="suggestion">
+                ✦ {{ tip }}
+            </div>
+        {% endfor %}
+        {% endif %}
+
+        {% if project_analysis.sample_templates %}
+        <details style="margin-top: 16px;">
+            <summary><strong>View Standard Project Description Templates & Examples</strong></summary>
+            <div style="margin-top: 12px;">
+                {% for t in project_analysis.sample_templates %}
+                <div class="suggestion" style="margin-bottom: 12px;">
+                    <strong style="color: #7054d9;">{{ t.category }}</strong> &middot; <span style="font-size: 12px; color: #666;">{{ t.description }}</span><br>
+                    <div style="margin-top: 6px;"><strong>Template:</strong> <code>{{ t.template }}</code></div>
+                    <div style="margin-top: 4px; font-style: italic; color: #777;"><strong>Example:</strong> {{ t.example }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </details>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    <!-- Action Verb Analysis (Issue #54) -->
+    {% if action_verb_analysis %}
+    <section class="result-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h2>Action Verb Analysis</h2>
+            <span class="tag" style="font-size: 12px; font-weight: 600;">
+                {{ action_verb_analysis.total_action_verbs }} Verbs Detected ({{ action_verb_analysis.unique_action_verbs }} Unique)
+            </span>
+        </div>
+
+        <p class="ats-note" style="margin-bottom: 20px;">
+            Evaluates the strength, variety, and impact of action verbs in your experience and project descriptions. Note: Suggestions are advisory; original resume text is never automatically altered.
+        </p>
+
+        <!-- Metrics Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px;">
+            <div style="background: var(--surface-soft, #faf9fe); border: 1px solid var(--border, #eeeef5); border-radius: 12px; padding: 14px; text-align: center;">
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--muted, #7c7797); font-weight: 600; margin-bottom: 4px;">Total Action Verbs</div>
+                <div style="font-size: 22px; font-weight: 700; color: var(--accent, #7054d9);">{{ action_verb_analysis.total_action_verbs }}</div>
+            </div>
+
+            <div style="background: var(--surface-soft, #faf9fe); border: 1px solid var(--border, #eeeef5); border-radius: 12px; padding: 14px; text-align: center;">
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--muted, #7c7797); font-weight: 600; margin-bottom: 4px;">Unique Verbs</div>
+                <div style="font-size: 22px; font-weight: 700; color: var(--text, #302b4c);">{{ action_verb_analysis.unique_action_verbs }}</div>
+            </div>
+
+            <div style="background: var(--surface-soft, #faf9fe); border: 1px solid var(--border, #eeeef5); border-radius: 12px; padding: 14px; text-align: center;">
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--muted, #7c7797); font-weight: 600; margin-bottom: 4px;">Vocabulary Diversity</div>
+                <div style="font-size: 22px; font-weight: 700; color: {% if action_verb_analysis.action_verb_diversity >= 60 %}#10b981{% elif action_verb_analysis.action_verb_diversity >= 40 %}#f59e0b{% else %}#d94545{% endif %};">{{ action_verb_analysis.action_verb_diversity }}%</div>
+            </div>
+
+            <div style="background: var(--surface-soft, #faf9fe); border: 1px solid var(--border, #eeeef5); border-radius: 12px; padding: 14px; text-align: center;">
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--muted, #7c7797); font-weight: 600; margin-bottom: 4px;">Repeated Verbs (≥3×)</div>
+                <div style="font-size: 22px; font-weight: 700; color: {% if action_verb_analysis.repeated_verbs|length > 0 %}#f59e0b{% else %}#10b981{% endif %};">{{ action_verb_analysis.repeated_verbs|length }}</div>
+            </div>
+        </div>
+
+        <!-- Repeated Verbs Highlight -->
+        {% if action_verb_analysis.repeated_verbs %}
+        <h3 class="ats-subheading" style="color: #b45309;">⚠ Frequently Repeated Action Verbs</h3>
+        <p class="ats-note" style="margin-bottom: 12px;">
+            Repeating the same action verb can make your bullet points sound monotonous. Try swapping some instances with these context-aware alternatives:
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px;">
+            {% for item in action_verb_analysis.repeated_verbs %}
+            <div style="background: #fffbeb; border: 1px solid #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <strong style="color: #92400e; font-size: 14px;">"{{ item.verb }}" (used {{ item.count }}×)</strong>
+                    <span style="font-size: 11px; color: #b45309;">Repeated</span>
+                </div>
+                <div style="font-size: 12px; color: #78350f; margin-bottom: 6px;">Recommended alternatives:</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                    {% for alt in item.suggested_alternatives %}
+                    <span style="background: #ffffff; color: #92400e; font-weight: 600; font-size: 11px; padding: 3px 8px; border-radius: 4px; border: 1px solid #fde68a;">+ {{ alt }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Sentence Suggestions Alongside Original Sentences -->
+        {% if action_verb_analysis.sentence_suggestions %}
+        <h3 class="ats-subheading">Contextual Verb Suggestions for Your Sentences</h3>
+        <p class="ats-note" style="margin-bottom: 14px;">
+            Here are your original sentences alongside tailored action verb suggestions to strengthen impact:
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
+            {% for item in action_verb_analysis.sentence_suggestions %}
+            <div style="background: var(--surface-soft, #faf9fe); border: 1px solid var(--border, #eeeef5); border-radius: 10px; padding: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 12px; font-weight: 600; color: {% if item.issue_type == 'vague' %}#d94545{% else %}#b45309{% endif %};">
+                        {% if item.issue_type == 'vague' %}Weak / Passive Phrasing: "{{ item.verb }}"{% else %}Repeated Verb: "{{ item.verb }}"{% endif %}
+                    </span>
+                    <span style="font-size: 11px; color: var(--muted, #8b87a5);">Sentence {{ loop.index }}</span>
+                </div>
+                <p style="margin: 0 0 10px 0; font-size: 13px; color: var(--text, #302b4c); line-height: 1.5; font-style: italic;">
+                    "{{ item.original_sentence }}"
+                </p>
+                <div style="display: flex; align-items: center; flex-wrap: gap: 6px; font-size: 12px; color: var(--text-soft, #555);">
+                    <strong style="color: var(--accent, #7054d9);">Suggested Action Verbs:</strong>
+                    {% for alt in item.suggested_alternatives %}
+                    <span style="background: rgba(112, 84, 217, 0.08); color: var(--accent, #7054d9); font-weight: 600; font-size: 11px; padding: 2px 8px; border-radius: 4px;">{{ alt }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Action Verbs by Domain -->
+        {% if action_verb_analysis.action_verbs_by_category %}
+        <h3 class="ats-subheading">Action Verbs by Domain</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 20px;">
+            {% for cat_name, verbs in action_verb_analysis.action_verbs_by_category.items() %}
+            <div style="background: var(--surface-soft, #faf9fe); border: 1px solid var(--border, #eeeef5); border-radius: 8px; padding: 12px;">
+                <strong style="font-size: 13px; color: var(--text, #302b4c); display: block; margin-bottom: 8px;">{{ cat_name }}</strong>
+                <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                    {% for v in verbs %}
+                    <span class="skill-tag" style="font-size: 11px; margin: 0; padding: 3px 8px;">
+                        {{ v.verb }} <small style="opacity: 0.7;">({{ v.count }}×)</small>
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if action_verb_analysis.recommendations %}
+        <h3 class="ats-subheading">Action Verb Recommendations</h3>
+        {% for tip in action_verb_analysis.recommendations %}
+            <div class="suggestion">
+                ✦ {{ tip }}
+            </div>
+        {% endfor %}
+        {% endif %}
+    </section>
+    {% endif %}
+
+    <!-- Resume Readability Analysis (Issue #55) -->
+    {% if readability_analysis %}
+    <section class="result-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h2>Resume Readability Analysis</h2>
+            <span class="tag" style="font-size: 12px; font-weight: 600;">
+                {{ readability_analysis.reading_level }}
+            </span>
+        </div>
+
+        <p class="ats-note" style="margin-bottom: 20px;">
+            Evaluates sentence length, linguistic complexity, and ease of scanning to ensure recruiters and hiring managers can quickly digest your qualifications.
+        </p>
+
+        <!-- Readability Metrics Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 22px;">
+            <div style="background: var(--surface-soft, #faf9fe); border: 1px solid var(--border, #eeeef5); border-radius: 12px; padding: 14px; text-align: center;">
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--muted, #7c7797); font-weight: 600; margin-bottom: 4px;">Avg Sentence Length</div>
+                <div style="font-size: 22px; font-weight: 700; color: var(--accent, #7054d9);">{{ readability_analysis.avg_sentence_length }} <span style="font-size: 13px; font-weight: normal; color: var(--text-soft, #555);">words</span></div>
+                <div style="font-size: 11px; color: var(--muted, #888); margin-top: 2px;">Target: 12–18 words</div>
+            </div>
+
+            <div style="background: var(--surface-soft, #faf9fe); border: 1px solid var(--border, #eeeef5); border-radius: 12px; padding: 14px; text-align: center;">
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--muted, #7c7797); font-weight: 600; margin-bottom: 4px;">Total Sentences</div>
+                <div style="font-size: 22px; font-weight: 700; color: var(--text, #302b4c);">{{ readability_analysis.sentence_count }}</div>
+                <div style="font-size: 11px; color: var(--muted, #888); margin-top: 2px;">Across {{ readability_analysis.word_count }} words</div>
+            </div>
+
+            <div style="background: var(--surface-soft, #faf9fe); border: 1px solid var(--border, #eeeef5); border-radius: 12px; padding: 14px; text-align: center;">
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--muted, #7c7797); font-weight: 600; margin-bottom: 4px;">Complex Word Usage</div>
+                <div style="font-size: 22px; font-weight: 700; color: {% if readability_analysis.complex_word_percentage > 25 %}#d94545{% else %}#10b981{% endif %};">{{ readability_analysis.complex_word_percentage }}%</div>
+                <div style="font-size: 11px; color: var(--muted, #888); margin-top: 2px;">3+ syllable words</div>
+            </div>
+
+            <div style="background: var(--surface-soft, #faf9fe); border: 1px solid var(--border, #eeeef5); border-radius: 12px; padding: 14px; text-align: center;">
+                <div style="font-size: 11px; text-transform: uppercase; color: var(--muted, #7c7797); font-weight: 600; margin-bottom: 4px;">Long Sentences</div>
+                <div style="font-size: 22px; font-weight: 700; color: {% if readability_analysis.long_sentence_count > 0 %}#f59e0b{% else %}#10b981{% endif %};">{{ readability_analysis.long_sentence_count }}</div>
+                <div style="font-size: 11px; color: var(--muted, #888); margin-top: 2px;">Over 25 words</div>
+            </div>
+        </div>
+
+        <!-- Unusually Long Sentences -->
+        {% if readability_analysis.long_sentences %}
+        <h3 class="ats-subheading" style="color: #b45309;">⚠ Unusually Long Sentences (Needs Tightening)</h3>
+        <p class="ats-note" style="margin-bottom: 12px;">
+            These sentences may be hard for recruiters to scan quickly. Consider breaking them into shorter, punchy bullet points:
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px;">
+            {% for item in readability_analysis.long_sentences %}
+            <div style="background: #fffbeb; border-left: 3px solid #f59e0b; padding: 12px 14px; border-radius: 6px; font-size: 13px; line-height: 1.5;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <strong style="color: #92400e;">Sentence {{ loop.index }}</strong>
+                    <span style="font-size: 11px; font-weight: 600; color: #b45309; background: #fef3c7; padding: 2px 8px; border-radius: 4px;">{{ item.word_count }} words</span>
+                </div>
+                <p style="margin: 0; color: #78350f;">"{{ item.sentence }}"</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Complex Words Sample -->
+        {% if readability_analysis.complex_words %}
+        <h3 class="ats-subheading">Complex Wording Sample</h3>
+        <p class="ats-note" style="margin-bottom: 10px;">
+            Technical terms and polysyllabic words identified in your resume:
+        </p>
+        <div class="skill-list" style="margin-bottom: 22px;">
+            {% for word in readability_analysis.complex_words %}
+            <span class="skill-tag" style="background: var(--surface-soft, #faf9fe); font-size: 12px;">{{ word }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Readability Recommendations -->
+        {% if readability_analysis.recommendations %}
+        <h3 class="ats-subheading">Readability Recommendations</h3>
+        {% for tip in readability_analysis.recommendations %}
+            <div class="suggestion">
+                ✦ {{ tip }}
+            </div>
+        {% endfor %}
+        {% endif %}
+    </section>
+    {% endif %}
+
+    <!-- Date & Timeline Consistency Analysis -->
+    {% if timeline_analysis %}
+    <section class="result-card">
+        <h2>Date & Timeline Consistency</h2>
+
+        <p class="ats-note">
+            Analysis of resume dates, chronology, and timeline formatting to help ensure a professional, consistent presentation.
+        </p>
+
+        <p class="ats-rating">
+            <strong>Status: {{ timeline_analysis.timeline_status }}</strong>
+            &middot; {{ timeline_analysis.total_ranges_detected }} date range{% if timeline_analysis.total_ranges_detected != 1 %}s{% endif %} detected
+        </p>
+
+        {% if timeline_analysis.detected_formats %}
+        <h3 class="ats-subheading">Detected Date Formats</h3>
+        <div class="skill-list">
+            {% for fmt in timeline_analysis.detected_formats %}
+                <span class="skill-tag">📅 {{ fmt }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if timeline_analysis.inconsistencies %}
+        <h3 class="ats-subheading">Observations & Advisory Notes</h3>
+        {% for inc in timeline_analysis.inconsistencies %}
+            <div class="suggestion">
+                <strong>{{ inc.title }}:</strong> {{ inc.message }}
+            </div>
+        {% endfor %}
+        {% else %}
+        <div class="suggestion">
+            ✦ All detected dates follow a consistent format and reverse-chronological order.
+        </div>
+        {% endif %}
+
+        {% if timeline_analysis.recommendations %}
+        <h3 class="ats-subheading">Timeline Recommendations</h3>
+        {% for tip in timeline_analysis.recommendations %}
+            <div class="suggestion">
+                ✦ {{ tip }}
+            </div>
+        {% endfor %}
+        {% endif %}
+    </section>
+    {% endif %}
+
+
     <!-- Job Description Matching -->
     {% if job_match and job_match.has_job_description %}
     <section class="result-card">
@@ -367,12 +1191,15 @@
         <p class="ats-rating">
             <strong>{{ job_match.match_percentage }}% Match</strong>
             &middot; {{ job_match.total_matching }} of {{ job_match.total_required }} Required Skills
+            {% if job_match.semantic_match_percentage is not none %}
+                &middot; {{ job_match.semantic_match_percentage }}% Semantic Similarity
+            {% endif %}
         </p>
 
         <div class="score-row">
             <div class="score-label">
-                <span>Skill Match Rate</span>
-                <strong>{{ job_match.total_matching }} / {{ job_match.total_required }}</strong>
+                <span>Overall Match Rate</span>
+                <strong>{{ job_match.match_percentage }}%</strong>
             </div>
 
             <div class="progress-track">
@@ -381,6 +1208,51 @@
                 </div>
             </div>
         </div>
+
+        <div class="score-row">
+            <div class="score-label">
+                <span>Keyword Skill Overlap</span>
+                <strong>{{ job_match.total_matching }} / {{ job_match.total_required }} ({{ job_match.keyword_match_percentage }}%)</strong>
+            </div>
+
+            <div class="progress-track">
+                <div class="progress-fill"
+                     data-width="{{ job_match.keyword_match_percentage }}">
+                </div>
+            </div>
+        </div>
+
+        {% if job_match.semantic_match_percentage is not none %}
+        <div class="score-row">
+            <div class="score-label">
+                <span>Semantic Content Similarity</span>
+                <strong>{{ job_match.semantic_match_percentage }}%</strong>
+            </div>
+
+            <div class="progress-track">
+                <div class="progress-fill"
+                     data-width="{{ job_match.semantic_match_percentage }}">
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if job_match.section_similarities %}
+        <h3 class="ats-subheading">Section Semantic Alignment</h3>
+        {% for sec_name, sec_score in job_match.section_similarities.items() %}
+        <div class="score-row">
+            <div class="score-label">
+                <span>{{ sec_name }}</span>
+                <strong>{{ sec_score }}%</strong>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill"
+                     data-width="{{ sec_score }}">
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
 
         <h3 class="ats-subheading">Matching Skills ({{ job_match.matching_skills|length }})</h3>
         {% if job_match.matching_skills %}
@@ -391,6 +1263,16 @@
             </div>
         {% else %}
             <p class="ats-note">No matching skills detected from the job description requirements.</p>
+        {% endif %}
+
+        {% if job_match.semantically_related_skills %}
+        <h3 class="ats-subheading">Semantically Related Skills ({{ job_match.semantically_related_skills|length }})</h3>
+        <p class="ats-note">Candidate skills identified by NLP as conceptually equivalent or related to job requirements:</p>
+        <div class="skill-list">
+            {% for item in job_match.semantically_related_skills %}
+                <span class="skill-tag semantic">~ {{ item.required_skill }} (relates to {{ item.matched_skill }} &middot; {{ item.similarity }}%)</span>
+            {% endfor %}
+        </div>
         {% endif %}
 
         <h3 class="ats-subheading">Missing Skills ({{ job_match.missing_skills|length }})</h3>
@@ -407,6 +1289,94 @@
                 <p class="ats-note">No specific technical skill requirements were found in the job description.</p>
             {% endif %}
         {% endif %}
+
+        <p class="ats-note" style="margin-top: 20px; font-style: italic; border-top: 1px solid #eeedf6; padding-top: 12px;">
+            ✦ {{ job_match.disclaimer }}
+        </p>
+    </section>
+    {% endif %}
+
+
+    <!-- Resume Improvement Roadmap -->
+    {% if roadmap %}
+    <section class="result-card roadmap-card" id="roadmap-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <h2>🚀 Resume Improvement Roadmap</h2>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <span class="tag" style="background: var(--surface-soft, #f3f0fc); color: var(--accent, #7054d9); font-weight: 600;">
+                    3-Phase Action Plan
+                </span>
+                <a href="/roadmap" class="back-link" style="font-size: 12px; margin: 0;">Open Full View ↗</a>
+            </div>
+        </div>
+
+        <p class="ats-note" style="margin-top: 8px;">{{ roadmap.summary }}</p>
+
+        <!-- Dynamic Roadmap Completion Progress Bar -->
+        <div style="margin: 16px 0; padding: 14px; background: var(--surface-soft, #f7f6fd); border-radius: 10px;">
+            <div class="score-label" style="margin-bottom: 6px;">
+                <strong>Roadmap Completion</strong>
+                <strong id="roadmap-progress-text">
+                    {{ roadmap.completed_tasks }} of {{ roadmap.total_tasks }} Tasks Completed ({{ roadmap.completion_percentage }}%)
+                </strong>
+            </div>
+            <div class="progress-track" style="height: 8px;">
+                <div class="progress-fill" id="roadmap-progress-bar" data-width="{{ roadmap.completion_percentage }}" style="width: {{ roadmap.completion_percentage }}%;"></div>
+            </div>
+            <small style="display: block; margin-top: 6px; color: var(--muted, #6b7280);">
+                Check off items as you complete them to track your improvement progress during this session.
+            </small>
+        </div>
+
+        <!-- Timeline Phases -->
+        <div class="roadmap-timeline" style="display: flex; flex-direction: column; gap: 20px; margin-top: 20px;">
+            {% for phase in roadmap.phases %}
+            <div class="roadmap-phase" style="border: 1px solid var(--border, #e5e7eb); border-radius: 12px; padding: 16px; background: var(--surface, #ffffff);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 16px; color: var(--heading, #1f1d2b);">
+                            {{ phase.name }}
+                        </h3>
+                        <small style="color: var(--muted, #6b7280); font-weight: 500;">
+                            Timeline: {{ phase.timeline }} &middot; {{ phase.description }}
+                        </small>
+                    </div>
+                    <span class="keyword-badge" style="{% if phase.priority == 'High' %}background: rgba(239, 68, 68, 0.15); color: #dc2626;{% elif phase.priority == 'Medium' %}background: rgba(245, 158, 11, 0.15); color: #d97706;{% else %}background: rgba(112, 84, 217, 0.15); color: #7054d9;{% endif %}">
+                        {{ phase.priority }} Priority
+                    </span>
+                </div>
+
+                <div class="task-list" style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
+                    {% for task in phase.tasks %}
+                    <label class="task-card" id="card_{{ task.id }}" style="display: flex; gap: 12px; align-items: flex-start; padding: 12px; background: var(--surface-soft, #faf9fe); border-radius: 8px; border: 1px solid var(--border, #eef0f6); cursor: pointer; transition: all 0.2s ease;">
+                        <input type="checkbox"
+                               class="roadmap-task-checkbox"
+                               data-task-id="{{ task.id }}"
+                               data-priority="{{ task.priority }}"
+                               {% if task.completed %}checked{% endif %}
+                               style="margin-top: 4px; width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent, #7054d9);">
+                        <div style="flex: 1;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                                <strong class="task-title" style="font-size: 14px; color: var(--heading, #1f1d2b);">
+                                    {{ task.title }}
+                                </strong>
+                                <span style="font-size: 11px; color: var(--muted, #6b7280); background: var(--surface, #ffffff); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border, #e5e7eb);">
+                                    ⏱ {{ task.estimated_time }}
+                                </span>
+                            </div>
+                            <p class="task-desc" style="font-size: 13px; color: var(--text, #374151); margin: 4px 0 0 0; line-height: 1.45;">
+                                {{ task.description }}
+                            </p>
+                            <small style="display: inline-block; margin-top: 4px; font-size: 11px; color: var(--accent-text, #7054d9);">
+                                🏷 {{ task.category }}
+                            </small>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     </section>
     {% endif %}
 
@@ -481,13 +1451,22 @@
 
     <div class="result-footer">
         <a href="/" class="hero-btn">Analyze Another Resume →</a>
+
+        <form action="/download-report" method="post">
+            <input type="hidden" name="report" value="{{ report_json }}">
+            <button type="submit" class="hero-btn">⬇ Download PDF Report</button>
+        </form>
+
+        <form action="/download-txt-report" method="post">
+            <input type="hidden" name="report" value="{{ report_json }}">
+            <button type="submit" class="hero-btn">⬇ Export as TXT</button>
+        </form>
     </div>
 
 </div>
     <!-- Progress Bar JavaScript -->
-     <script src="{{ url_for('static', filename='script.js') }}"></script>
     <script>
-        document.querySelectorAll('.progress-fill').forEach(bar => {
+        document.querySelectorAll('.progress-fill, .keyword-bar').forEach(bar => {
             bar.style.width = bar.dataset.width + '%';
         });
     </script>

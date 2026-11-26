@@ -196,6 +196,7 @@ class TestJobMatcher(unittest.TestCase):
             self.assertIn(b"Python", response.data)
             self.assertIn(b"Docker", response.data)
 
+
     def test_generate_missing_skill_suggestions_basic(self):
         missing = ["Docker", "Kubernetes"]
         suggestions = generate_missing_skill_suggestions(missing)
@@ -298,6 +299,56 @@ class TestJobMatcher(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertIn(b"Missing Skills Suggestions", response.data)
             self.assertIn(b"Great job! Your resume covers all required skills detected for this role.", response.data)
+
+    def test_semantic_skill_accounting_and_partial_credit(self):
+        """Verify accounting consistency and partial credit for semantically related skills."""
+        # JD requires 3 skills: Python, Machine Learning, AWS
+        # Candidate has Python (exact) and Deep Learning (semantic equivalent to Machine Learning)
+        resume_skills = ["Python", "Deep Learning"]
+        jd = "Requirements: Python, Machine Learning, AWS"
+        result = match_resume_to_job(resume_skills, jd)
+
+        self.assertEqual(result["total_required"], 3)
+        self.assertEqual(result["exact_matching_count"], 1)
+        self.assertEqual(result["semantic_matching_count"], 1)
+        self.assertEqual(result["total_matching"], 2)
+        self.assertEqual(len(result["missing_skills"]), 1)
+        self.assertIn("AWS", result["missing_skills"])
+
+        # Accounting rule: total_matching (exact + semantic) + missing == total_required
+        self.assertEqual(
+            result["total_matching"] + len(result["missing_skills"]),
+            result["total_required"],
+        )
+
+        # Partial credit: candidate should get more than 1/3 (33%) due to semantic match
+        self.assertGreater(result["keyword_match_percentage"], 33)
+
+    def test_report_includes_semantically_related_skills(self):
+        """Verify build_report includes semantically related skills without dropping them."""
+        from analyzer.report_generator import build_report
+
+        mock_data = {
+            "score": 75,
+            "breakdown": {"Technical Skills": 15},
+            "skills": ["Python", "Deep Learning"],
+            "suggestions": ["Add more cloud skills"],
+            "job_match": {
+                "has_job_description": True,
+                "match_percentage": 70,
+                "total_matching": 2,
+                "total_required": 3,
+                "matching_skills": ["Python"],
+                "semantically_related_skills": [
+                    {"required_skill": "Machine Learning", "matched_skill": "Deep Learning", "similarity": 85}
+                ],
+                "missing_skills": ["AWS"],
+            },
+        }
+        pdf_bytes = build_report(mock_data)
+        self.assertIsInstance(pdf_bytes, bytes)
+        self.assertGreater(len(pdf_bytes), 500)
+
 
 
 if __name__ == "__main__":

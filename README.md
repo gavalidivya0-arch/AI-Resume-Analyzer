@@ -9,8 +9,6 @@ Built for beginners to read, run and contribute to. Part of
 ## What it does
 
 - Upload a resume as a PDF or DOCX file (max 10 MB)
-- Extracts the text from the file (`pypdf` for PDF, `python-docx` for DOCX)
-- Upload a resume as a PDF or DOCX (max 10 MB)
 - Extracts PDF text with `pypdf` and DOCX text with `python-docx`
 - Detects skills such as Python, SQL, Flask, React, Git and more
 - Gives a resume score with a breakdown (contact info, summary, skills,
@@ -31,10 +29,9 @@ Built for beginners to read, run and contribute to. Part of
 ```
 app.py                      Flask app: routes for upload and results
 analyzer/
-  pdf_reader.py             Extracts text from a PDF
-  docx_reader.py            Extracts text from a DOCX
   resume_extractor.py       Extracts text from PDF and DOCX files
   pdf_reader.py             Backward-compatible PDF extraction wrapper
+  docx_reader.py            Extracts text from a DOCX
   skills_extractor.py       Finds skills in the text and gives suggestions
   resume_scorer.py          Calculates the resume score and breakdown
   job_matcher.py            Extracts job skills and matches them to resumes
@@ -67,6 +64,24 @@ The app opens at http://127.0.0.1:5000. Upload a PDF or DOCX resume and check th
 
 Please test with your own resume or a sample one. Do not upload other people's
 resumes to the repository.
+
+## Evaluation & Accuracy Benchmarking
+
+The project includes an automated benchmark suite to evaluate skill extraction precision, recall, and F1-score against synthetic test resumes containing zero real-world personal information:
+
+```bash
+# Run the evaluation benchmark summary
+python -m benchmarks.run_benchmark
+
+# Show detailed per-sample accuracy breakdown
+python -m benchmarks.run_benchmark --verbose
+
+# Save evaluation results as JSON
+python -m benchmarks.run_benchmark --output benchmarks/baseline.json
+
+# Compare accuracy against a saved baseline to verify improvements or prevent regressions
+python -m benchmarks.run_benchmark --compare benchmarks/baseline.json
+```
 
 ## How to contribute
 

@@ -91,6 +91,7 @@ COMMON_SYMBOLS = set("•▪●◦■–—‘’“”₹€£©®·…")
 def detect_sections(text):
     """Return the set of section keys whose heading appears in the text."""
     found = set()
+    text = text or ""
 
     for line in text.splitlines():
         line = line.strip()
@@ -111,6 +112,7 @@ def detect_sections(text):
 
 def check_contact(text):
     """Check which contact details are present as plain text."""
+    text = text or ""
     return {
         "email": bool(EMAIL_RE.search(text)),
         "phone": bool(PHONE_RE.search(text)),
@@ -121,6 +123,7 @@ def check_contact(text):
 def check_formatting(text):
     """Return a list of (severity, message) formatting/readability issues."""
     issues = []
+    text = text or ""
     stripped = text.strip()
     words = stripped.split()
 
@@ -161,7 +164,7 @@ def check_formatting(text):
         1 for ch in text
         if ord(ch) > 127 and ch not in COMMON_SYMBOLS and not ch.isalpha()
     )
-    if odd_chars / len(text) > 0.01:
+    if len(text) > 0 and odd_chars / len(text) > 0.01:
         issues.append((
             "medium",
             "Many special symbols or icons detected. Decorative icons may be "
@@ -192,6 +195,8 @@ def check_formatting(text):
 
 def check_keywords(text, found_skills):
     """Check keyword usage: skills, action verbs and measurable results."""
+    text = text or ""
+    found_skills = found_skills or []
     words_in_text = set(re.findall(r"[a-z]+", text.lower()))
 
     return {

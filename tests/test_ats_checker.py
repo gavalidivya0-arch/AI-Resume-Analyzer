@@ -47,6 +47,13 @@ class DetectSectionsTests(unittest.TestCase):
         text = "I have a lot of experience building web applications daily"
         self.assertEqual(detect_sections(text), set())
 
+    def test_none_input_does_not_crash(self):
+        self.assertEqual(detect_sections(None), set())
+        result = analyze_ats(None, found_skills=None)
+        self.assertIsInstance(result, dict)
+        self.assertIn("score", result)
+
+
 
 class AnalyzeAtsTests(unittest.TestCase):
 
