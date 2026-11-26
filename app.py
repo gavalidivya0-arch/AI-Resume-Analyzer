@@ -1,23 +1,12 @@
 import io
 import json
 import os
-import uuid
 import threading
 import webbrowser
 
-
 from docx.opc.exceptions import PackageNotFoundError
-from flask import Flask, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, send_file, session
 
-from flask import Flask, jsonify, redirect, render_template, request, send_file, session, url_for
-
-from werkzeug.utils import secure_filename
-from docx.opc.exceptions import PackageNotFoundError
-
-
-from analyzer.docx_reader import DocxReadError
-
-from analyzer.pdf_reader import extract_pdf_text
 from analyzer.docx_reader import DocxReadError, check_docx_file
 
 from analyzer.resume_extractor import extract_resume_text
@@ -62,10 +51,6 @@ app.secret_key = os.environ.get("SECRET_KEY", "resume-ai-roadmap-session-key-202
 app.config["UPLOAD_FOLDER"] = os.environ.get("RESUME_UPLOAD_FOLDER", DEFAULT_TEMP_DIR)
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
-ALLOWED_EXTENSIONS = {".pdf", ".docx"}
-# The optional job description is cut to this many characters
-MAX_JOB_DESCRIPTION_LENGTH = 20000
-
 # Ensure dedicated temporary upload directory exists with restricted permissions
 get_temp_upload_dir(app.config["UPLOAD_FOLDER"])
 cleanup_stale_temp_files(app.config["UPLOAD_FOLDER"])
@@ -86,31 +71,9 @@ def analyze():
     if not is_valid:
         return error_resp
 
-
-    file = request.files["resume"]
-
-    if not file.filename:
-        return "No file selected."
-
-    original_filename = file.filename
-    extension = os.path.splitext(original_filename)[1].lower()
-
-    if extension not in ALLOWED_EXTENSIONS:
-        return "Only PDF and DOCX files are allowed."
-
     # Used in messages shown to the user: "PDF" or "DOCX"
     file_type = extension[1:].upper()
-
-    filename = secure_filename(original_filename)
-
-    if not filename:
-        return "Invalid filename."
-
-    unique_filename = f"{uuid.uuid4().hex}_{filename}"
-
-    file_type = extension[1:].upper()
     unique_filename = generate_secure_filename(extension)
-
 
     filepath = os.path.join(
         app.config["UPLOAD_FOLDER"],
@@ -204,9 +167,6 @@ def analyze():
         )
 
         # Job Description Matching
-
-        job_match = match_resume_to_job(found_skills, job_description)
-
         job_match = match_resume_to_job(
             found_skills,
             job_description,
@@ -214,11 +174,14 @@ def analyze():
             resume_sections=resume_sections
         )
 
-        # Results for the report (sent back by Download buttons)
         # Semantic and Exact Duplicate Content Detection
         duplicate_analysis = detect_duplicates(resume_text)
         # Personalized Skill Gap Analysis against selected or best-matching career role
-        target_role = request.form.get("target_role", "").strip() or None
+        if request.is_json and request.json:
+            raw_role = request.json.get("target_role", "")
+        else:
+            raw_role = request.form.get("target_role", "")
+        target_role = str(raw_role or "").strip() or None
         skill_gap = analyze_skill_gap(found_skills, target_role=target_role)
         # Generate personalized 3-phase improvement roadmap from actual analysis results
         roadmap = generate_roadmap(
@@ -228,7 +191,9 @@ def analyze():
             ats_result=ats_result,
             keyword_analysis=keyword_analysis,
             job_match=job_match,
+            skill_gap=skill_gap,
             recommendations=recommendations,
+            target_role=target_role,
         )
         session["roadmap"] = roadmap
         session["completed_tasks"] = []
@@ -289,6 +254,16 @@ def analyze():
                 "ats_result": ats_result,
                 "job_match": job_match,
                 "keyword_analysis": keyword_analysis,
+                "section_quality": section_quality,
+                "project_analysis": project_analysis,
+                "action_verbs": action_verb_analysis,
+                "readability": readability_analysis,
+                "timeline": timeline_analysis,
+                "certifications": certifications,
+                "achievements": achievements,
+                "duplicate_analysis": duplicate_analysis,
+                "skill_gap": skill_gap,
+                "roadmap": roadmap,
                 "resume_sections": resume_sections,
                 "report": report,
             }), 200
@@ -333,22 +308,25 @@ def analyze():
         # DocxReadError messages are written for the user, so they are safe
         # to show. PackageNotFoundError comes from python-docx when the
         # uploaded file is not a valid DOCX.
-        if isinstance(error, PackageNotFoundError):
-            return "This file is not a valid DOCX document."
-        return str(error)
+        msg = (
+            "This file is not a valid DOCX document."
+            if isinstance(error, PackageNotFoundError)
+            else str(error)
+        )
+        return format_error_response(
+            message=msg,
+            status_code=400,
+            error_code="INVALID_DOCX_FILE",
+            request=request,
+            legacy_200_for_html=True,
+        )
 
     except OCRError as error:
         # OCR errors (e.g. missing tesseract or image read failure) provide clear guidance
-        return str(error)
-    except PackageNotFoundError:
-        return "This file is not a valid DOCX document."
-
-    except DocxReadError as error:
-        # The message was written for the user, so it is safe to show
         return format_error_response(
             message=str(error),
-            status_code=400,
-            error_code="INVALID_DOCX_FILE",
+            status_code=422,
+            error_code="OCR_PROCESSING_ERROR",
             request=request,
             legacy_200_for_html=True,
         )
@@ -515,8 +493,17 @@ def toggle_roadmap_task():
     task_id = data.get("task_id")
     completed = data.get("completed")
 
+    valid_task_ids = {t.get("id") for t in roadmap.get("all_tasks", []) if t.get("id")}
+    if not task_id or task_id not in valid_task_ids:
+        return jsonify({
+            "status": "error",
+            "error": "Invalid or missing roadmap task_id.",
+            "code": "INVALID_TASK_ID",
+        }), 400
+
     if isinstance(completed, str):
         completed = completed.lower() in ("true", "1", "yes")
+    completed = bool(completed)
 
     completed_tasks = set(session.get("completed_tasks", []))
     if completed:

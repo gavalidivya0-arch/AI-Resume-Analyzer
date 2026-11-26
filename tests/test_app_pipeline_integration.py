@@ -1,0 +1,137 @@
+import io
+import unittest
+from unittest.mock import patch
+
+from docx import Document
+
+from analyzer.ocr import OCRError
+from app import app
+
+
+def make_sample_docx_bytes(text="Jane Doe\njane@example.com\nSKILLS\nPython, SQL\n"):
+    doc = Document()
+    for line in text.splitlines():
+        doc.add_paragraph(line)
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+class TestAppPipelineIntegration(unittest.TestCase):
+
+    def setUp(self):
+        self.client = app.test_client()
+
+    def test_roadmap_incorporates_selected_target_role_and_skill_gap(self):
+        """Skill gap & target role must propagate into generated improvement roadmap."""
+        resp = self.client.post(
+            "/api/analyze",
+            data={
+                "resume": (io.BytesIO(make_sample_docx_bytes()), "resume.docx"),
+                "target_role": "Frontend Developer",
+            },
+            content_type="multipart/form-data",
+            headers={"Accept": "application/json"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.get_json()
+        self.assertEqual(payload["status"], "success")
+        self.assertEqual(payload["skill_gap"]["target_role"], "Frontend Developer")
+        self.assertEqual(payload["roadmap"]["target_role"], "Frontend Developer")
+
+        # Verify skill-gap remediation tasks exist in roadmap
+        categories = {t["category"] for t in payload["roadmap"]["all_tasks"]}
+        self.assertIn("Skill Development", categories)
+
+    def test_api_analyze_includes_all_pipeline_modules(self):
+        """API JSON response should provide complete parity with UI analysis sections."""
+        resp = self.client.post(
+            "/api/analyze",
+            data={"resume": (io.BytesIO(make_sample_docx_bytes()), "resume.docx")},
+            content_type="multipart/form-data",
+            headers={"Accept": "application/json"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.get_json()
+        for key in (
+            "section_quality",
+            "project_analysis",
+            "action_verbs",
+            "readability",
+            "timeline",
+            "certifications",
+            "achievements",
+            "duplicate_analysis",
+            "skill_gap",
+            "roadmap",
+        ):
+            self.assertIn(key, payload)
+
+    @patch("app.match_resume_to_job")
+    def test_job_matcher_is_not_called_twice_per_request(self, mock_matcher):
+        """match_resume_to_job must execute only once per /analyze invocation."""
+        mock_matcher.return_value = {
+            "has_job_description": False,
+            "matching_skills": [],
+            "missing_skills": [],
+            "match_percentage": 0,
+        }
+        resp = self.client.post(
+            "/analyze",
+            data={"resume": (io.BytesIO(make_sample_docx_bytes()), "resume.docx")},
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(resp.status_code, 200)
+        mock_matcher.assert_called_once()
+
+    def test_api_fake_docx_returns_400_json_error(self):
+        """Invalid DOCX file sent to /api/analyze must return 400 JSON, not 200 plain text."""
+        resp = self.client.post(
+            "/api/analyze",
+            data={"resume": (io.BytesIO(b"corrupted non-docx bytes"), "fake.docx")},
+            content_type="multipart/form-data",
+            headers={"Accept": "application/json"},
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertTrue(resp.is_json)
+        data = resp.get_json()
+        self.assertEqual(data["status"], "error")
+        self.assertEqual(data["code"], "INVALID_DOCX_FILE")
+
+    @patch("app.extract_resume_text", side_effect=OCRError("Tesseract OCR not available"))
+    def test_api_ocr_error_returns_422_json_error(self, _mock_extract):
+        """OCRError must route through format_error_response with 422 JSON for API clients."""
+        resp = self.client.post(
+            "/api/analyze",
+            data={"resume": (io.BytesIO(b"%PDF-1.4 dummy"), "scanned.pdf")},
+            content_type="multipart/form-data",
+            headers={"Accept": "application/json"},
+        )
+        self.assertEqual(resp.status_code, 422)
+        self.assertTrue(resp.is_json)
+        data = resp.get_json()
+        self.assertEqual(data["code"], "OCR_PROCESSING_ERROR")
+        self.assertIn("Tesseract OCR", data["error"])
+
+    def test_roadmap_toggle_rejects_missing_or_invalid_task_id(self):
+        """/roadmap/toggle must reject null or nonexistent task_ids instead of polluting session."""
+        # Initialize valid session roadmap
+        self.client.post(
+            "/analyze",
+            data={"resume": (io.BytesIO(make_sample_docx_bytes()), "resume.docx")},
+            content_type="multipart/form-data",
+        )
+
+        resp_missing = self.client.post("/roadmap/toggle", json={"completed": True})
+        self.assertEqual(resp_missing.status_code, 400)
+        self.assertEqual(resp_missing.get_json()["code"], "INVALID_TASK_ID")
+
+        resp_invalid = self.client.post(
+            "/roadmap/toggle", json={"task_id": "non_existent_id", "completed": True}
+        )
+        self.assertEqual(resp_invalid.status_code, 400)
+        self.assertEqual(resp_invalid.get_json()["code"], "INVALID_TASK_ID")
+
+
+if __name__ == "__main__":
+    unittest.main()
