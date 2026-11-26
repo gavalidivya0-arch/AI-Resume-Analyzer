@@ -169,5 +169,22 @@ class ResumeExtractorTests(unittest.TestCase):
             extract_resume_text("resume.txt")
 
 
+
+    @patch("analyzer.resume_extractor.extract_ocr_from_images")
+    @patch("analyzer.resume_extractor.extract_images_from_page")
+    @patch("analyzer.resume_extractor.PdfReader")
+    def test_extract_pdf_text_applies_ocr_fallback_for_scanned_pages(
+        self, reader_class, mock_extract_images, mock_ocr
+    ):
+        scanned_page = MagicMock()
+        scanned_page.extract_text.return_value = ""
+        reader_class.return_value.pages = [scanned_page]
+        mock_extract_images.return_value = [MagicMock()]
+        mock_ocr.return_value = "Scanned OCR Experience"
+
+        result = extract_pdf_text("scanned.pdf", enable_ocr=True)
+        self.assertIn("Scanned OCR Experience", result)
+
+
 if __name__ == "__main__":
     unittest.main()

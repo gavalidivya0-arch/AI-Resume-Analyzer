@@ -70,54 +70,47 @@ def extract_pdf_text(
     enable_ocr: bool = True,
     min_text_chars: int = MIN_PAGE_TEXT_CHARS,
 ) -> str:
-
-    """Extract and clean text from every page of a PDF file.
+    """Extract and clean text from every page of a PDF file, applying OCR to scanned pages.
 
     Pages are read in document order. Pages without extractable text (for
-    example scanned images) are skipped, and a PDF with no readable text
-    returns an empty string. Invalid or unreadable PDFs raise the underlying
-    pypdf error so the caller can show a meaningful message.
+    example scanned images) fall back to OCR if enabled. Invalid or unreadable PDFs
+    raise the underlying pypdf error so the caller can show a meaningful message.
     """
-
-    """Extract text from every page of a PDF file, applying OCR to scanned pages."""
-
     reader = (reader_class or PdfReader)(filepath)
     pages = []
 
-    for page in reader.pages:
-        try:
-            page_text = page.extract_text()
-        except Exception:
-            # One unreadable page should not discard the rest of the resume.
-            continue
-
-        cleaned = _normalize_pdf_text(page_text)
-        if cleaned:
-            pages.append(cleaned)
-
-    if not pages:
-        return ""
-
     try:
         for page in reader.pages:
-            page_text = page.extract_text() or ""
+            try:
+                page_text = page.extract_text() or ""
+            except Exception:
+                # One unreadable page should not discard the rest of the resume
+                page_text = ""
+
+            cleaned = _normalize_pdf_text(page_text)
 
             # Normal text extraction for pages with sufficient text
-            if len(page_text.strip()) >= min_text_chars or not enable_ocr:
-                if page_text:
-                    text += page_text + "\n"
+            if len(cleaned) >= min_text_chars or not enable_ocr:
+                if cleaned:
+                    pages.append(cleaned)
                 continue
 
             # Page has insufficient extractable text: check for scanned images to OCR
-            images = extract_images_from_page(page)
-            if images:
-                ocr_text = extract_ocr_from_images(images)
-                parts = [p.strip() for p in (page_text, ocr_text) if p and p.strip()]
-                if parts:
-                    text += "\n".join(parts) + "\n"
-            else:
-                if page_text:
-                    text += page_text + "\n"
+            ocr_text = ""
+            try:
+                images = extract_images_from_page(page)
+                if images:
+                    ocr_text = extract_ocr_from_images(images)
+            except Exception:
+                ocr_text = ""
+
+            cleaned_ocr = _normalize_pdf_text(ocr_text)
+            parts = [p for p in (cleaned, cleaned_ocr) if p]
+            if parts:
+                pages.append("\n".join(parts))
+            elif cleaned:
+                pages.append(cleaned)
+
     finally:
         # Ensure file streams opened by PdfReader are explicitly closed
         if hasattr(reader, "close"):
@@ -132,6 +125,8 @@ def extract_pdf_text(
             except Exception:
                 pass
 
+    if not pages:
+        return ""
 
     return "\n".join(pages) + "\n"
 
